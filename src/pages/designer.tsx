@@ -13,10 +13,10 @@ interface MeasurementFile {
 export default function Designer() {
   const [available, setAvailable] = useState<Job[]>([]);
   const [myJob, setMyJob] = useState<Job | null>(null);
-  
+
   // FIXED: Added missing state for images
   const [measurementImages, setMeasurementImages] = useState<MeasurementFile[]>([]);
-  
+
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
 
@@ -85,15 +85,15 @@ export default function Designer() {
   // FIXED: Logic to load images based on myJob
   const loadMeasurementImagesForDesigner = async (job: Job) => {
     if (!job.job_id) {
-        setMeasurementImages([]);
-        return;
+      setMeasurementImages([]);
+      return;
     }
 
     const { data, error } = await supabase
       .from("jobs")
       .select("*")
       // FIXED: Usually files are linked via job_id
-      .eq("job_id", job.job_id) 
+      .eq("job_id", job.job_id)
       .order("id", { ascending: true });
 
     if (error) {
@@ -139,59 +139,59 @@ export default function Designer() {
     load();
   };
 
-const submitJobToBilling = async () => {
-  if (!myJob || files.length === 0) {
-    alert("Please upload at least one design file");
-    return;
-  }
-
-  setUploading(true);
-
-  try {
-    const urls: string[] = [];
-
-    for (const file of files) {
-      const path = `${myJob.job_id}/${Date.now()}_${file.name}`;
-
-      // 1️⃣ Upload to storage
-      await supabase.storage
-        .from("design-files")
-        .upload(path, file, { upsert: true });
-
-      // 2️⃣ Get public URL
-      const { data } = supabase.storage
-        .from("design-files")
-        .getPublicUrl(path);
-
-      urls.push(data.publicUrl);
+  const submitJobToBilling = async () => {
+    if (!myJob || files.length === 0) {
+      alert("Please upload at least one design file");
+      return;
     }
 
-    // 3️⃣ SAVE URLs TO JOB (🔥 THIS IS THE KEY)
-    await supabase.from("jobs").update({
-      design_url: urls.join(","), // ✅ Billing & Printer rely on this
-      status: "WAIT_BILLING",
-      assigned_to: null,
-      assigned_role: null,
-    }).eq("job_id", myJob.job_id);
+    setUploading(true);
 
-    // 4️⃣ Close DESIGN workflow log
-    await supabase.from("job_workflow_logs")
-      .update({ time_out: new Date().toISOString() })
-      .eq("job_id", myJob.job_id)
-      .eq("stage", "DESIGN")
-      .is("time_out", null);
+    try {
+      const urls: string[] = [];
 
-    alert("✅ Files uploaded and sent to Billing");
-    setFiles([]);
-    setMyJob(null);
-    load();
-  } catch (err) {
-    console.error(err);
-    alert("❌ Failed to upload design files");
-  } finally {
-    setUploading(false);
-  }
-};
+      for (const file of files) {
+        const path = `${myJob.job_id}/${Date.now()}_${file.name}`;
+
+        // 1️⃣ Upload to storage
+        await supabase.storage
+          .from("design-files")
+          .upload(path, file, { upsert: true });
+
+        // 2️⃣ Get public URL
+        const { data } = supabase.storage
+          .from("design-files")
+          .getPublicUrl(path);
+
+        urls.push(data.publicUrl);
+      }
+
+      // 3️⃣ SAVE URLs TO JOB (🔥 THIS IS THE KEY)
+      await supabase.from("jobs").update({
+        design_url: urls.join(","), // ✅ Billing & Printer rely on this
+        status: "DESIGN_REVIEW", // Send to attendant for approval first
+        assigned_to: null,
+        assigned_role: null,
+      }).eq("job_id", myJob.job_id);
+
+      // 4️⃣ Close DESIGN workflow log
+      await supabase.from("job_workflow_logs")
+        .update({ time_out: new Date().toISOString() })
+        .eq("job_id", myJob.job_id)
+        .eq("stage", "DESIGN")
+        .is("time_out", null);
+
+      alert("✅ Files uploaded and sent for Attendant approval");
+      setFiles([]);
+      setMyJob(null);
+      load();
+    } catch (err) {
+      console.error(err);
+      alert("❌ Failed to upload design files");
+    } finally {
+      setUploading(false);
+    }
+  };
 
 
   /* ---------------- UI ---------------- */
@@ -250,7 +250,7 @@ const submitJobToBilling = async () => {
                   <label style={styles.label}>Instructions</label>
                   <p style={styles.description}>{myJob.description || "No special instructions provided."}</p>
                 </div>
-                
+
                 <div style={styles.infoBox}>
                   <label style={styles.label}>Required Dimensions</label>
                   <div style={styles.previewContainer}>
@@ -399,19 +399,19 @@ const styles: Record<string, React.CSSProperties> = {
   },
   // New Styles for Image Grid
   imageGrid: {
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
-      gap: "12px",
-      marginTop: "10px"
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
+    gap: "12px",
+    marginTop: "10px"
   },
   measurementThumb: {
-      width: "100%",
-      height: "100px",
-      objectFit: "cover",
-      borderRadius: "6px",
-      border: "1px solid #e2e8f0",
-      cursor: "pointer",
-      transition: "opacity 0.2s"
+    width: "100%",
+    height: "100px",
+    objectFit: "cover",
+    borderRadius: "6px",
+    border: "1px solid #e2e8f0",
+    cursor: "pointer",
+    transition: "opacity 0.2s"
   },
   uploadSection: { marginTop: "20px", padding: "24px", border: "2px dashed #e2e8f0", borderRadius: "12px" },
   fileInputWrapper: { position: "relative", marginBottom: "20px" },

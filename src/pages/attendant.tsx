@@ -643,6 +643,48 @@ export default function Attendant() {
     }
   };
 
+  // Approve design and send to billing
+  const approveDesign = async (job: Job) => {
+    const confirm = window.confirm(`Approve design for ${job.customer_name} and send to billing?`);
+    if (!confirm) return;
+
+    setLoading(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Update job status to WAIT_BILLING
+      const { error } = await supabase
+        .from("jobs")
+        .update({
+          status: "WAIT_BILLING",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("job_id", job.job_id);
+
+      if (error) throw error;
+
+      // Log the approval in workflow
+      await supabase.from("job_workflow_logs").insert({
+        job_id: job.job_id,
+        stage: "DESIGN_APPROVED",
+        worker_name: user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Attendant",
+        user_name: user?.email || null,
+        user_id: user?.id || null,
+        time_in: new Date().toISOString(),
+        time_out: new Date().toISOString(),
+      });
+
+      alert("✅ Design approved and sent to billing");
+      refreshData();
+    } catch (err) {
+      console.error("Error approving design:", err);
+      alert("❌ Failed to approve design");
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   return (
     <div style={{ backgroundColor: "#f8fafc", minHeight: "100vh" }}>
@@ -893,26 +935,70 @@ export default function Attendant() {
               <h3 style={styles.heading}>📊 Live Tracker</h3>
             </div>
             <div style={styles.trackerList}>
-              {jobs.map((job) => (
-                <div key={job.job_id} style={styles.trackerItem}>
-                  <div style={{ flex: 1 }}>
-                    <div style={styles.trackerTitle}>{job.bill_no || `#${job.job_id}`}</div>
-                    <div style={styles.trackerSub}>{job.customer_name} • {job.job_type}</div>
-                    <button onClick={() => generateBill(job)} style={styles.btnPrint}>
-                      🖨️ Print Bill
-                    </button>
-                    <button
-                      onClick={() => downloadJobSheet(job)} style={styles.btndwn}
-                    >
-                      Download Job Sheet PDF
-                    </button>
+              {jobs.map((job) => {
+                // Parse design files
+                const designUrls = job.design_url
+                  ? job.design_url.split(',').map(url => url.trim()).filter(Boolean)
+                  : [];
 
+                return (
+                  <div key={job.job_id} style={styles.trackerItem}>
+                    <div style={{ flex: 1 }}>
+                      <div style={styles.trackerTitle}>
+                        {job.bill_no || `#${job.job_id}`}
+                        {designUrls.length > 0 && (
+                          <span style={styles.designBadge}>
+                            🎨 {designUrls.length} Design{designUrls.length > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                      <div style={styles.trackerSub}>{job.customer_name} • {job.job_type}</div>
+
+                      {/* Design Files Section */}
+                      {designUrls.length > 0 && (
+                        <div style={styles.designFilesContainer}>
+                          <div style={styles.designFilesLabel}>📥 Design Files:</div>
+                          <div style={styles.designButtonsRow}>
+                            {designUrls.map((url, index) => (
+                              <a
+                                key={index}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={styles.btnDownloadDesign}
+                              >
+                                ⬇️ Design {index + 1}
+                              </a>
+                            ))}
+                            {job.status === "DESIGN_REVIEW" && (
+                              <button
+                                onClick={() => approveDesign(job)}
+                                disabled={loading}
+                                style={styles.btnApproveDesign}
+                              >
+                                ✅ Approve Design
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <button onClick={() => generateBill(job)} style={styles.btnPrint}>
+                        🖨️ Print Bill
+                      </button>
+                      <button
+                        onClick={() => downloadJobSheet(job)} style={styles.btndwn}
+                      >
+                        Download Job Sheet PDF
+                      </button>
+
+                    </div>
+                    <span style={{ ...styles.statusBadge, backgroundColor: getStatusColor(job.status) }}>
+                      {job.status}
+                    </span>
                   </div>
-                  <span style={{ ...styles.statusBadge, backgroundColor: getStatusColor(job.status) }}>
-                    {job.status}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -926,6 +1012,7 @@ export default function Attendant() {
 const getStatusColor = (status: string) => {
   switch (status) {
     case "DESIGN": return "#3498db";
+    case "DESIGN_REVIEW": return "#a855f7"; // Purple
     case "WAIT_BILLING": return "#8e44ad";
     case "PRINTING": return "#e67e22";
     case "DELIVERY": return "#9b59b6";
@@ -992,6 +1079,36 @@ const styles: Record<string, React.CSSProperties> = {
   btnPrint: { marginTop: "5px", backgroundColor: "#333", border: "1px solid #ddd", padding: "3px 8px", borderRadius: "4px", fontSize: "11px", cursor: "pointer", color: "white", display: "flex", gap: "4px", alignItems: "center" },
   btndwn: { marginTop: "5px", backgroundColor: "#333", border: "1px solid #ddd", padding: "3px 8px", borderRadius: "4px", fontSize: "11px", cursor: "pointer", color: "white", display: "flex", gap: "4px", alignItems: "center" },
   statusBadge: { fontSize: "10px", padding: "4px 8px", borderRadius: "12px", color: "white", fontWeight: "bold", textTransform: "uppercase", minWidth: "70px", textAlign: "center" },
+
+  // Design Files
+  designBadge: { marginLeft: "8px", fontSize: "10px", backgroundColor: "#e0f2fe", color: "#0369a1", padding: "3px 8px", borderRadius: "12px", fontWeight: "600" },
+  designFilesContainer: { marginTop: "8px", marginBottom: "8px", padding: "8px", backgroundColor: "#f0f9ff", borderRadius: "6px", border: "1px solid #bae6fd" },
+  designFilesLabel: { fontSize: "10px", fontWeight: "bold", color: "#0369a1", marginBottom: "6px", textTransform: "uppercase" },
+  designButtonsRow: { display: "flex", gap: "6px", flexWrap: "wrap" },
+  btnDownloadDesign: {
+    padding: "4px 10px",
+    backgroundColor: "#0ea5e9",
+    color: "white",
+    borderRadius: "4px",
+    fontSize: "10px",
+    fontWeight: "600",
+    textDecoration: "none",
+    cursor: "pointer",
+    display: "inline-block",
+    transition: "background-color 0.2s"
+  },
+  btnApproveDesign: {
+    padding: "4px 10px",
+    backgroundColor: "#10b981",
+    color: "white",
+    borderRadius: "4px",
+    fontSize: "10px",
+    fontWeight: "600",
+    border: "none",
+    cursor: "pointer",
+    display: "inline-block",
+    transition: "background-color 0.2s"
+  },
 
   // Misc
   dotAvailable: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#f59e0b" },
