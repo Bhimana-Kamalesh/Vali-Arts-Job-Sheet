@@ -4,7 +4,6 @@ import Header from "../components/Header";
 import type { Job } from "../lib/types";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { generateOTP } from "../utils/otp";
 
 // --- Types ---
 interface MeasurementJob {
@@ -19,10 +18,6 @@ interface MeasurementJob {
 }
 
 export default function Attendant() {
-  // 🔢 STEP 8: OTP UI State
-  const [otpJob, setOtpJob] = useState<Job | null>(null);
-  const [otpInput, setOtpInput] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
 
@@ -600,133 +595,7 @@ export default function Attendant() {
 
 
 
-  // 🔐 STEP 7: Send OTP for Office Pickup
-  const sendOtp = async (job: Job) => {
-    if (loading) return;
 
-    setOtpJob(job);
-    setLoading(true);
-
-    // ⏱️ Cooldown check (2 min)
-    const { data: existing } = await supabase
-      .from("jobs")
-      .select("otp_generated_at")
-      .eq("job_id", job.job_id)
-      .single();
-
-    if (existing?.otp_generated_at) {
-      const elapsed =
-        Date.now() - new Date(existing.otp_generated_at).getTime();
-
-      if (elapsed < 2 * 60 * 1000) {
-        setLoading(false);
-        return alert("Please wait 2 minutes before resending OTP");
-      }
-    }
-
-    const otp = generateOTP();
-
-    // Save OTP
-    const { error: otpError } = await supabase
-      .from("jobs")
-      .update({
-        otp_code: otp,
-        otp_verified: false,
-        otp_generated_at: new Date().toISOString(),
-      })
-      .eq("job_id", job.job_id);
-
-    if (otpError) {
-      setLoading(false);
-      return alert("Failed to generate OTP");
-    }
-
-    // Send WhatsApp OTP
-    const { error: waError } = await supabase.functions.invoke(
-      "send-whatsapp",
-      {
-        body: {
-          type: "OTP",
-          job_id: job.job_id,
-          phone: job.phone,
-        },
-      }
-    );
-
-    setLoading(false);
-
-    if (waError) {
-      console.error("🔥 WhatsApp invoke error:", waError);
-      alert(
-        "WhatsApp Error:\n" +
-        JSON.stringify(waError, null, 2)
-      );
-      return;
-    }
-
-    setOtpSent(true);
-    alert("🔐 OTP sent to customer");
-  };
-
-  const verifyOtpAndConfirm = async () => {
-    if (!otpJob || !otpInput) {
-      alert("Enter OTP");
-      return;
-    }
-
-    const enteredOtp = otpInput.replace(/\s+/g, "");
-
-    setLoading(true);
-
-    const { data, error } = await supabase
-      .from("jobs")
-      .select("otp_code, otp_generated_at")
-      .eq("job_id", otpJob.job_id)
-      .single();
-
-    if (error || !data) {
-      setLoading(false);
-      return alert("Job not found");
-    }
-
-    const expired =
-      Date.now() - new Date(data.otp_generated_at).getTime() >
-      10 * 60 * 1000;
-
-    if (expired) {
-      setLoading(false);
-      return alert("OTP expired. Please resend.");
-    }
-
-    if (data.otp_code !== enteredOtp) {
-      setLoading(false);
-      return alert("Invalid OTP");
-    }
-
-    // ✅ OTP VERIFIED
-    await supabase.from("jobs").update({
-      otp_verified: true,
-      otp_code: null,
-      status: "DESIGN",
-      assigned_to: null,
-      assigned_role: null,
-    }).eq("job_id", otpJob.job_id);
-
-    // Close workflow log (CREATED)
-    await supabase.from("job_workflow_logs")
-      .update({ time_out: new Date().toISOString() })
-      .eq("job_id", otpJob.job_id)
-      .eq("stage", "CREATED")
-      .is("time_out", null);
-
-    setLoading(false);
-    setOtpInput("");
-    setOtpSent(false);
-    setOtpJob(null);
-
-    alert("✅ Job confirmed with OTP");
-    refreshData();
-  };
 
   const openMeasurement = async (m: MeasurementJob) => {
     setSelectedMeasurement(m);
@@ -889,31 +758,7 @@ export default function Attendant() {
         {/* === COLUMN 2: PICKUPS & MEASUREMENTS LIST === */}
         <div style={styles.column}>
 
-          {/* OTP Verification Box (Dynamic) */}
-          {otpSent && otpJob && (
-            <div style={styles.otpBox}>
-              <h4 style={styles.otpHeader}>
-                🔐 Verify OTP for {otpJob.customer_name}
-              </h4>
 
-              <input
-                type="tel"
-                placeholder="Enter OTP"
-                value={otpInput}
-                onChange={(e) => setOtpInput(e.target.value)}
-                maxLength={6}
-                style={styles.input}
-              />
-
-              <button
-                onClick={verifyOtpAndConfirm}
-                disabled={loading}
-                style={styles.btnDone}
-              >
-                {loading ? "Verifying..." : "✅ Verify OTP & Confirm Job"}
-              </button>
-            </div>
-          )}
 
 
           {/* Pickups */}
@@ -931,9 +776,7 @@ export default function Attendant() {
                     <span style={styles.badge}>#{job.job_card_no}</span>
                   </div>
                   <div style={styles.cardMeta}>{job.size} • {job.material}</div>
-                  <button onClick={() => sendOtp(job)} style={styles.btnAction}>
-                    🔐 Send OTP
-                  </button>
+
                 </div>
               ))}
             </div>
