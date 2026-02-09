@@ -1,0 +1,444 @@
+import React, { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
+import Header from "../components/Header";
+import type { Job } from "../lib/types";
+
+// Define interface for images to avoid TS errors
+interface MeasurementFile {
+  id: number;
+  file_url: string;
+  file_type: string;
+}
+
+export default function Designer() {
+  const [available, setAvailable] = useState<Job[]>([]);
+  const [myJob, setMyJob] = useState<Job | null>(null);
+  
+  // FIXED: Added missing state for images
+  const [measurementImages, setMeasurementImages] = useState<MeasurementFile[]>([]);
+  
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  /* ---------------- HELPERS ---------------- */
+
+  const parseSizes = (size?: string) => {
+    if (!size) return [];
+    return size
+      .split(",")
+      .map(s => s.trim())
+      .map(pair => {
+        const [w, h] = pair.split("x").map(Number);
+        if (!w || !h) return null;
+        return { width: w, height: h };
+      })
+      .filter(Boolean) as { width: number; height: number }[];
+  };
+
+  const renderSizePreview = (width: number, height: number, index: number) => {
+    const maxPreview = 140;
+    const scale = Math.max(width, height) > 0 ? maxPreview / Math.max(width, height) : 1;
+
+    return (
+      <div key={index} style={styles.previewItem}>
+        <div
+          style={{
+            width: Math.round(width * scale),
+            height: Math.round(height * scale),
+            ...styles.previewBox
+          }}
+        >
+          {width} × {height}
+        </div>
+      </div>
+    );
+  };
+
+  /* ---------------- DATA LOAD ---------------- */
+
+  const load = async () => {
+    const { data: auth } = await supabase.auth.getUser();
+    const uid = auth.user?.id;
+    if (!uid) return;
+
+    const { data: pool } = await supabase
+      .from("jobs")
+      .select("*")
+      .eq("status", "DESIGN")
+      .is("assigned_to", null);
+
+    const { data: mine } = await supabase
+      .from("jobs")
+      .select("*")
+      .eq("assigned_to", uid)
+      .eq("assigned_role", "designer")
+      .eq("status", "DESIGN");
+
+    setAvailable(pool || []);
+    setMyJob(mine?.[0] || null);
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  // FIXED: Logic to load images based on myJob
+  const loadMeasurementImagesForDesigner = async (job: Job) => {
+    if (!job.job_id) {
+        setMeasurementImages([]);
+        return;
+    }
+
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("*")
+      // FIXED: Usually files are linked via job_id
+      .eq("job_id", job.job_id) 
+      .order("id", { ascending: true });
+
+    if (error) {
+      console.error("Error loading images:", error);
+      return;
+    }
+
+    setMeasurementImages(data || []);
+  };
+
+  // FIXED: Watch 'myJob', not undefined 'selectedJob'
+  useEffect(() => {
+    if (myJob) {
+      loadMeasurementImagesForDesigner(myJob);
+    } else {
+      setMeasurementImages([]);
+    }
+  }, [myJob]);
+
+  /* ---------------- ACTIONS ---------------- */
+
+  const accept = async (id: number) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    if (myJob) {
+      alert("Please finish your current active job first.");
+      return;
+    }
+
+    await supabase.from("jobs").update({
+      assigned_to: user.id,
+      assigned_role: "designer",
+    }).eq("job_id", id);
+
+    await supabase.from("job_workflow_logs").insert({
+      job_id: id,
+      stage: "DESIGN",
+      worker_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Designer",
+      time_in: new Date().toISOString(),
+    });
+
+    load();
+  };
+
+const submitJobToBilling = async () => {
+  if (!myJob || files.length === 0) {
+    alert("Please upload at least one design file");
+    return;
+  }
+
+  setUploading(true);
+
+  try {
+    const urls: string[] = [];
+
+    for (const file of files) {
+      const path = `${myJob.job_id}/${Date.now()}_${file.name}`;
+
+      // 1️⃣ Upload to storage
+      await supabase.storage
+        .from("design-files")
+        .upload(path, file, { upsert: true });
+
+      // 2️⃣ Get public URL
+      const { data } = supabase.storage
+        .from("design-files")
+        .getPublicUrl(path);
+
+      urls.push(data.publicUrl);
+    }
+
+    // 3️⃣ SAVE URLs TO JOB (🔥 THIS IS THE KEY)
+    await supabase.from("jobs").update({
+      design_url: urls.join(","), // ✅ Billing & Printer rely on this
+      status: "WAIT_BILLING",
+      assigned_to: null,
+      assigned_role: null,
+    }).eq("job_id", myJob.job_id);
+
+    // 4️⃣ Close DESIGN workflow log
+    await supabase.from("job_workflow_logs")
+      .update({ time_out: new Date().toISOString() })
+      .eq("job_id", myJob.job_id)
+      .eq("stage", "DESIGN")
+      .is("time_out", null);
+
+    alert("✅ Files uploaded and sent to Billing");
+    setFiles([]);
+    setMyJob(null);
+    load();
+  } catch (err) {
+    console.error(err);
+    alert("❌ Failed to upload design files");
+  } finally {
+    setUploading(false);
+  }
+};
+
+
+  /* ---------------- UI ---------------- */
+
+  return (
+    <div style={{ backgroundColor: "#f8fafc", minHeight: "100vh" }}>
+      <Header title="Designer Portal" />
+
+      <div style={styles.mainLayout}>
+        {/* LEFT: QUEUE */}
+        <div style={styles.queueSidebar}>
+          <div style={styles.sectionHeader}>
+            <span style={styles.dotAvailable} />
+            <h3 style={styles.heading}>Incoming Pool</h3>
+            <span style={styles.badge}>{available.length}</span>
+          </div>
+
+          <div style={styles.scrollArea}>
+            {available.length === 0 && (
+              <p style={styles.emptyText}>No jobs waiting in the queue.</p>
+            )}
+            {available.map(j => (
+              <div key={j.job_id} style={styles.card}>
+                <div style={styles.cardInfo}>
+                  <div style={styles.cardTitle}>{j.customer_name}</div>
+                  <div style={styles.cardMeta}>{j.job_type} • {j.size}</div>
+                </div>
+                <button onClick={() => accept(j.job_id)} style={styles.btnAccept}>
+                  Claim
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* RIGHT: WORKBENCH */}
+        <div style={styles.workbench}>
+          <div style={styles.sectionHeader}>
+            <span style={styles.dotActive} />
+            <h3 style={styles.heading}>Active Workbench</h3>
+          </div>
+
+          {myJob ? (
+            <div style={styles.activeContent}>
+              <div style={styles.jobDetailsHeader}>
+                <div>
+                  <h2 style={styles.customerName}>{myJob.customer_name}</h2>
+                  <span style={styles.idBadge}>ID: #{myJob.job_id}</span>
+                </div>
+                <div style={styles.statusTag}>IN PROGRESS</div>
+              </div>
+
+              {/* Info Grid */}
+              <div style={styles.infoGrid}>
+                <div style={styles.infoBox}>
+                  <label style={styles.label}>Instructions</label>
+                  <p style={styles.description}>{myJob.description || "No special instructions provided."}</p>
+                </div>
+                
+                <div style={styles.infoBox}>
+                  <label style={styles.label}>Required Dimensions</label>
+                  <div style={styles.previewContainer}>
+                    {parseSizes(myJob.size).map((s, i) => renderSizePreview(s.width, s.height, i))}
+                  </div>
+                </div>
+              </div>
+
+              {/* FIXED: Moved Measurement Images INSIDE the workbench so layout doesn't break */}
+              {measurementImages.length > 0 && (
+                <div style={styles.infoBox}>
+                  <label style={styles.label}>📸 Site Measurement Photos</label>
+                  <div style={styles.imageGrid}>
+                    {measurementImages.map((img) => (
+                      <img
+                        key={img.id}
+                        src={img.file_url}
+                        alt="Site Measurement"
+                        style={styles.measurementThumb}
+                        onClick={() => window.open(img.file_url, "_blank")}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Upload Section */}
+              <div style={styles.uploadSection}>
+                <label style={styles.label}>Final Design Upload</label>
+                <div style={styles.fileInputWrapper}>
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(e) => setFiles(e.target.files ? Array.from(e.target.files) : [])}
+                    style={styles.fileInput}
+                    id="file-upload"
+                  />
+                  <label htmlFor="file-upload" style={styles.fileLabel}>
+                    {files.length > 0 ? `Selected ${files.length} files` : "Click to browse or drag designs here"}
+                  </label>
+                </div>
+
+                <button
+                  onClick={submitJobToBilling}
+                  disabled={uploading || files.length === 0}
+                  style={uploading || files.length === 0 ? styles.btnDoneDisabled : styles.btnDone}
+                >
+                  {uploading ? "Uploading Designs..." : "Complete & Push to Billing"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={styles.emptyWorkbench}>
+              <div style={styles.emptyIcon}>🎨</div>
+              <h4>Your workbench is empty</h4>
+              <p>Claim a job from the queue to start designing</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  mainLayout: {
+    display: "grid",
+    gridTemplateColumns: "350px 1fr",
+    gap: "24px",
+    padding: "24px",
+    maxWidth: "1400px",
+    margin: "0 auto",
+  },
+  queueSidebar: {
+    backgroundColor: "white",
+    borderRadius: "12px",
+    border: "1px solid #e2e8f0",
+    display: "flex",
+    flexDirection: "column",
+    height: "calc(100vh - 120px)",
+    overflow: "hidden",
+  },
+  workbench: {
+    backgroundColor: "white",
+    borderRadius: "12px",
+    border: "1px solid #e2e8f0",
+    padding: "24px",
+    height: "calc(100vh - 120px)",
+    overflowY: "auto",
+  },
+  sectionHeader: {
+    padding: "20px",
+    borderBottom: "1px solid #f1f5f9",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  },
+  heading: { margin: 0, fontSize: "16px", fontWeight: 700, color: "#1e293b" },
+  scrollArea: { padding: "12px", overflowY: "auto", flex: 1 },
+  card: {
+    padding: "16px",
+    borderRadius: "10px",
+    backgroundColor: "#fff",
+    border: "1px solid #f1f5f9",
+    marginBottom: "12px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    transition: "transform 0.1s ease",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+  },
+  cardTitle: { fontWeight: 600, color: "#334155", fontSize: "14px" },
+  cardMeta: { fontSize: "12px", color: "#64748b", marginTop: "4px" },
+  btnAccept: {
+    backgroundColor: "#eff6ff",
+    color: "#2563eb",
+    border: "none",
+    padding: "8px 12px",
+    borderRadius: "6px",
+    fontSize: "12px",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  activeContent: { display: "flex", flexDirection: "column", gap: "24px" },
+  jobDetailsHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
+  customerName: { margin: 0, fontSize: "24px", color: "#0f172a" },
+  idBadge: { fontSize: "12px", color: "#94a3b8", fontWeight: 500 },
+  statusTag: { backgroundColor: "#fef3c7", color: "#92400e", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: 700 },
+  infoGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" },
+  infoBox: { padding: "16px", borderRadius: "8px", backgroundColor: "#f8fafc", border: "1px solid #f1f5f9" },
+  label: { display: "block", fontSize: "12px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: "8px" },
+  description: { margin: 0, color: "#334155", lineHeight: "1.5" },
+  previewContainer: { display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "10px" },
+  previewItem: { display: 'flex', alignItems: 'center' },
+  previewBox: {
+    background: "#dcfce7",
+    border: "2px solid #22c55e",
+    borderRadius: "6px",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    color: "#166534",
+    fontWeight: 700,
+    fontSize: "11px",
+    boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
+  },
+  // New Styles for Image Grid
+  imageGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
+      gap: "12px",
+      marginTop: "10px"
+  },
+  measurementThumb: {
+      width: "100%",
+      height: "100px",
+      objectFit: "cover",
+      borderRadius: "6px",
+      border: "1px solid #e2e8f0",
+      cursor: "pointer",
+      transition: "opacity 0.2s"
+  },
+  uploadSection: { marginTop: "20px", padding: "24px", border: "2px dashed #e2e8f0", borderRadius: "12px" },
+  fileInputWrapper: { position: "relative", marginBottom: "20px" },
+  fileInput: { opacity: 0, width: "100%", height: "80px", cursor: "pointer" },
+  fileLabel: {
+    position: "absolute",
+    top: 0, left: 0, right: 0, bottom: 0,
+    display: "flex", justifyContent: "center", alignItems: "center",
+    backgroundColor: "#fff", color: "#64748b", borderRadius: "8px", border: "1px solid #e2e8f0",
+    pointerEvents: "none", fontSize: "14px"
+  },
+  btnDone: {
+    width: "100%",
+    padding: "16px",
+    backgroundColor: "#10b981",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    fontWeight: 700,
+    cursor: "pointer",
+    boxShadow: "0 4px 12px rgba(16, 185, 129, 0.2)",
+  },
+  btnDoneDisabled: { backgroundColor: "#cbd5e1", width: "100%", padding: "16px", borderRadius: "8px", color: "#94a3b8", border: "none" },
+  emptyWorkbench: { textAlign: "center", padding: "60px 20px", color: "#94a3b8" },
+  emptyIcon: { fontSize: "48px", marginBottom: "16px" },
+  badge: { backgroundColor: "#f1f5f9", color: "#475569", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 700 },
+  dotAvailable: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#f59e0b" },
+  dotActive: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#2563eb" },
+  emptyText: { textAlign: "center", fontSize: "13px", color: "#94a3b8", marginTop: "40px" }
+};
