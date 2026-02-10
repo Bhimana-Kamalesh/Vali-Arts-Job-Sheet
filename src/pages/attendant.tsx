@@ -859,6 +859,45 @@ export default function Attendant() {
     }
   };
 
+  const completePickup = async (job: Job) => {
+    const confirm = window.confirm(`Confirm pickup for ${job.customer_name}?`);
+    if (!confirm) return;
+
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { error } = await supabase
+        .from("jobs")
+        .update({
+          status: "COMPLETED",
+          updated_at: new Date().toISOString()
+        })
+        .eq("job_id", job.job_id);
+
+      if (error) throw error;
+
+      await supabase.from("job_workflow_logs").insert({
+        job_id: job.job_id,
+        stage: "COMPLETED",
+        worker_name: user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Attendant",
+        user_name: user?.email || null,
+        user_id: user?.id || null,
+        notes: "Item picked up from office",
+        time_in: new Date().toISOString(),
+        time_out: new Date().toISOString(),
+      });
+
+      alert("✅ Job marked as COMPLETED");
+      refreshData();
+    } catch (err: any) {
+      console.error("Error completing pickup:", err);
+      alert("❌ Failed to complete pickup: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const saveNewItem = async () => {
     if (!addItemModal.jobId) return;
     setLoading(true);
@@ -1150,9 +1189,15 @@ export default function Attendant() {
                     </div>
                     <span style={styles.badge}>#{job.job_card_no}</span>
                   </div>
-                  <div style={styles.cardMeta}>{job.size} • {job.material} • {job.phone}</div>
+                  <div style={styles.cardMeta}>{job.size} • {job.material} • {job.phone} • Bal: ₹{job.balance || 0}</div>
 
-
+                  <button
+                    onClick={() => completePickup(job)}
+                    disabled={loading}
+                    style={{ ...styles.btnAction, backgroundColor: "#2ecc71", marginTop: "12px" }}
+                  >
+                    📦 Mark Handed Over
+                  </button>
                 </div>
               ))}
             </div>
