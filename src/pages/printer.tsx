@@ -145,10 +145,13 @@ export default function Printer() {
               <p style={styles.emptyText}>No files waiting to print.</p>
             )}
 
-            {available.map(j => (
-              <div key={j.job_id} style={styles.card}>
+            {available.sort((a, b) => (b.is_urgent ? 1 : 0) - (a.is_urgent ? 1 : 0)).map(j => (
+              <div key={j.job_id} style={j.is_urgent ? { ...styles.card, ...styles.urgentCard } : styles.card}>
                 <div>
-                  <div style={styles.cardTitle}>{j.customer_name}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <div style={styles.cardTitle}>{j.bill_no}</div>
+                    {j.is_urgent && <span style={styles.urgentBadge}>URGENT</span>}
+                  </div>
                   <div style={styles.cardMeta}>
                     {j.size} • {j.material || "Flex"}
                   </div>
@@ -318,5 +321,21 @@ const styles: Record<string, React.CSSProperties> = {
   badge: { backgroundColor: "#f1f5f9", color: "#475569", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 700 },
   dotAvailable: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#f59e0b" },
   dotActive: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#ef4444" },
-  emptyText: { textAlign: "center", fontSize: "13px", color: "#94a3b8", marginTop: "40px" }
+  emptyText: { textAlign: "center", fontSize: "13px", color: "#94a3b8", marginTop: "40px" },
+
+  // Urgent Job Styles
+  urgentCard: {
+    borderLeft: "4px solid #ef4444",
+    backgroundColor: "#fff5f5",
+    boxShadow: "0 2px 8px rgba(239, 68, 68, 0.2)"
+  },
+  urgentBadge: {
+    backgroundColor: "#ef4444",
+    color: "white",
+    padding: "2px 8px",
+    borderRadius: "12px",
+    fontSize: "10px",
+    fontWeight: 700,
+    textTransform: "uppercase" as const
+  }
 };

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import Header from "../components/Header";
-import type { Job } from "../lib/types";
+import type { Job, JobItem } from "../lib/types";
 
 // Define interface for images to avoid TS errors
 interface MeasurementFile {
@@ -13,6 +13,7 @@ interface MeasurementFile {
 export default function Designer() {
   const [available, setAvailable] = useState<Job[]>([]);
   const [myJob, setMyJob] = useState<Job | null>(null);
+  const [jobItems, setJobItems] = useState<JobItem[]>([]);
 
   // FIXED: Added missing state for images
   const [measurementImages, setMeasurementImages] = useState<MeasurementFile[]>([]);
@@ -75,7 +76,31 @@ export default function Designer() {
       .eq("status", "DESIGN");
 
     setAvailable(pool || []);
-    setMyJob(mine?.[0] || null);
+    const currentJob = mine?.[0] || null;
+    setMyJob(currentJob);
+
+    // Load job items if there's an active job
+    if (currentJob) {
+      await loadJobItems(currentJob.job_id);
+    } else {
+      setJobItems([]);
+    }
+  };
+
+  const loadJobItems = async (jobId: number) => {
+    const { data, error } = await supabase
+      .from("job_items")
+      .select("*")
+      .eq("job_id", jobId)
+      .order("position", { ascending: true });
+
+    if (error) {
+      console.error("Error loading job items:", error);
+      setJobItems([]);
+      return;
+    }
+
+    setJobItems(data || []);
   };
 
   useEffect(() => {
@@ -133,6 +158,7 @@ export default function Designer() {
       job_id: id,
       stage: "DESIGN",
       worker_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Designer",
+      user_id: user.id,
       time_in: new Date().toISOString(),
     });
 
@@ -213,10 +239,13 @@ export default function Designer() {
             {available.length === 0 && (
               <p style={styles.emptyText}>No jobs waiting in the queue.</p>
             )}
-            {available.map(j => (
-              <div key={j.job_id} style={styles.card}>
+            {available.sort((a, b) => (b.is_urgent ? 1 : 0) - (a.is_urgent ? 1 : 0)).map(j => (
+              <div key={j.job_id} style={j.is_urgent ? { ...styles.card, ...styles.urgentCard } : styles.card}>
                 <div style={styles.cardInfo}>
-                  <div style={styles.cardTitle}>{j.customer_name}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <div style={styles.cardTitle}>{j.bill_no} • {j.customer_name}</div>
+                    {j.is_urgent && <span style={styles.urgentBadge}>URGENT</span>}
+                  </div>
                   <div style={styles.cardMeta}>{j.job_type} • {j.size}</div>
                 </div>
                 <button onClick={() => accept(j.job_id)} style={styles.btnAccept}>
@@ -244,19 +273,76 @@ export default function Designer() {
                 <div style={styles.statusTag}>IN PROGRESS</div>
               </div>
 
-              {/* Info Grid */}
-              <div style={styles.infoGrid}>
-                <div style={styles.infoBox}>
-                  <label style={styles.label}>Instructions</label>
-                  <p style={styles.description}>{myJob.description || "No special instructions provided."}</p>
-                </div>
+              {/* Job Items Display */}
+              <div style={styles.itemsSection}>
+                <label style={styles.sectionLabel}>Job Items ({jobItems.length || 1})</label>
+                {jobItems.length > 0 ? (
+                  jobItems.map((item, index) => (
+                    <div key={item.id || index} style={styles.itemCard}>
+                      <div style={styles.itemHeader}>
+                        <span style={styles.itemNumber}>Item {index + 1}</span>
+                        <span style={styles.itemType}>{item.job_type}</span>
+                      </div>
 
-                <div style={styles.infoBox}>
-                  <label style={styles.label}>Required Dimensions</label>
-                  <div style={styles.previewContainer}>
-                    {parseSizes(myJob.size).map((s, i) => renderSizePreview(s.width, s.height, i))}
+                      {item.description && (
+                        <div style={styles.infoRow}>
+                          <label style={styles.label}>Description</label>
+                          <p style={styles.description}>{item.description}</p>
+                        </div>
+                      )}
+
+                      <div style={styles.infoRow}>
+                        <label style={styles.label}>Dimensions</label>
+                        <div style={styles.previewContainer}>
+                          {parseSizes(item.size).map((s, i) => renderSizePreview(s.width, s.height, i))}
+                        </div>
+                      </div>
+
+                      {item.quantity && (
+                        <div style={styles.infoRow}>
+                          <label style={styles.label}>Quantity</label>
+                          <p style={styles.description}>{item.quantity}</p>
+                        </div>
+                      )}
+
+                      {item.material && (
+                        <div style={styles.infoRow}>
+                          <label style={styles.label}>Material</label>
+                          <p style={styles.description}>{item.material}</p>
+                        </div>
+                      )}
+
+                      {item.cost && item.cost > 0 ? (
+                        <div style={styles.infoRow}>
+                          <label style={styles.label}>Extra Cost</label>
+                          <p style={styles.description}>₹{item.cost}</p>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))
+                ) : (
+                  // Fallback to old single-item display if no items in job_items table
+                  <div style={styles.itemCard}>
+                    <div style={styles.itemHeader}>
+                      <span style={styles.itemNumber}>Item 1</span>
+                      <span style={styles.itemType}>{myJob.job_type}</span>
+                    </div>
+
+                    {myJob.description && (
+                      <div style={styles.infoRow}>
+                        <label style={styles.label}>Description</label>
+                        <p style={styles.description}>{myJob.description}</p>
+                      </div>
+                    )}
+
+                    <div style={styles.infoRow}>
+                      <label style={styles.label}>Dimensions</label>
+                      <div style={styles.previewContainer}>
+                        {parseSizes(myJob.size).map((s, i) => renderSizePreview(s.width, s.height, i))}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* FIXED: Moved Measurement Images INSIDE the workbench so layout doesn't break */}
@@ -381,6 +467,15 @@ const styles: Record<string, React.CSSProperties> = {
   statusTag: { backgroundColor: "#fef3c7", color: "#92400e", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: 700 },
   infoGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" },
   infoBox: { padding: "16px", borderRadius: "8px", backgroundColor: "#f8fafc", border: "1px solid #f1f5f9" },
+
+  // Item Display Styles
+  itemsSection: { marginBottom: "20px" },
+  sectionLabel: { display: "block", fontSize: "14px", fontWeight: 700, color: "#1e293b", marginBottom: "16px", textTransform: "uppercase" as const },
+  itemCard: { padding: "16px", marginBottom: "16px", backgroundColor: "#f8fafc", border: "2px solid #e2e8f0", borderRadius: "8px" },
+  itemHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", paddingBottom: "8px", borderBottom: "1px solid #cbd5e1" },
+  itemNumber: { fontSize: "13px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" as const },
+  itemType: { fontSize: "12px", fontWeight: 600, color: "#2563eb", backgroundColor: "#eff6ff", padding: "4px 10px", borderRadius: "12px" },
+  infoRow: { marginBottom: "12px" },
   label: { display: "block", fontSize: "12px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: "8px" },
   description: { margin: 0, color: "#334155", lineHeight: "1.5" },
   previewContainer: { display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "10px" },
@@ -440,5 +535,21 @@ const styles: Record<string, React.CSSProperties> = {
   badge: { backgroundColor: "#f1f5f9", color: "#475569", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 700 },
   dotAvailable: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#f59e0b" },
   dotActive: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#2563eb" },
-  emptyText: { textAlign: "center", fontSize: "13px", color: "#94a3b8", marginTop: "40px" }
+  emptyText: { textAlign: "center", fontSize: "13px", color: "#94a3b8", marginTop: "40px" },
+
+  // Urgent Job Styles
+  urgentCard: {
+    borderLeft: "4px solid #ef4444",
+    backgroundColor: "#fff5f5",
+    boxShadow: "0 2px 8px rgba(239, 68, 68, 0.2)"
+  },
+  urgentBadge: {
+    backgroundColor: "#ef4444",
+    color: "white",
+    padding: "2px 8px",
+    borderRadius: "12px",
+    fontSize: "10px",
+    fontWeight: 700,
+    textTransform: "uppercase" as const
+  }
 };

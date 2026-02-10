@@ -1,3 +1,16 @@
+export interface JobItem {
+  id?: number;
+  job_id?: number;
+  job_type: string;
+  description: string;
+  size: string;
+  quantity: string;
+  material: string;
+  position?: number;
+  cost?: number;
+  created_at?: string;
+}
+
 export interface Job {
   job_id: number;
 
@@ -26,6 +39,7 @@ export interface Job {
   status: string;
   delivery_mode?: string;
   needs_fixing?: boolean;
+  is_urgent?: boolean;
 
   assigned_to?: string | null;
   assigned_role?: string | null;
@@ -36,6 +50,9 @@ export interface Job {
 
   created_at?: string;
   updated_at?: string;
+
+  // 🆕 Multiple items support
+  items?: JobItem[];
 }
 
 export interface User {

@@ -21,6 +21,19 @@ export default function Attendant() {
   const [loading, setLoading] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
 
+  // 🆕 Add Item Modal State
+  const [addItemModal, setAddItemModal] = useState<{ open: boolean; jobId: number | null }>({ open: false, jobId: null });
+  const [newItemForm, setNewItemForm] = useState({
+    job_type: "Flex Banner",
+    description: "",
+    width: "",
+    height: "",
+    unit: "ft",
+    quantity: "1",
+    material: "",
+    cost: ""
+  });
+
 
   // --- Form State ---
   const [form, setForm] = useState({
@@ -30,18 +43,18 @@ export default function Attendant() {
     bill_no: "",
     date: "",
     area: "",
-    job_type: "Flex Banner",
-    description: "",
-    size: "",
-    sizes: [{ width: "", height: "" }],
-    quantity: "",
-    material: "",
-    design_file: "",
     cost: "",
     advance: "",
     mode_of_payment: "Cash",
     delivery_mode: "office",
     needs_fixing: false,
+    is_urgent: false,
+    items: [{
+      job_type: "Flex Banner",
+      description: "",
+      sizes: [{ width: "", height: "", unit: "ft", quantity: "" }],
+      material: ""
+    }]
   });
 
   const [measurementForm, setMeasurementForm] = useState({
@@ -59,35 +72,44 @@ export default function Attendant() {
   const [selectedMeasurement, setSelectedMeasurement] = useState<MeasurementJob | null>(null);
   const [measurementFiles, setMeasurementFiles] = useState<any[]>([]);
 
+  // 🆕 Search State
+  const [searchTerm, setSearchTerm] = useState("");
+
   const updateDraftJob = async () => {
     if (!editingJob) return;
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
-    const sizeString = form.sizes
-      .filter(s => s.width && s.height)
-      .map(s => `${s.width}x${s.height}`)
+
+    // Use first item for backward compatibility
+    const firstItem = form.items[0];
+    const sizeString = firstItem.sizes
+      .filter((s: any) => s.width && s.height)
+      .map((s: any) => `${s.width}x${s.height}`)
       .join(", ");
+
     const { error } = await supabase
       .from("jobs")
       .update({
         customer_name: form.customer_name,
         phone: form.phone,
         area: form.area,
-        job_type: form.job_type,
-        description: form.description,
+        job_type: firstItem.job_type,
+        description: firstItem.description,
         size: sizeString,
-        quantity: form.quantity,
-        material: form.material,
+        quantity: firstItem.sizes[0]?.quantity || "",
+        material: firstItem.material,
         cost: form.cost,
         advance: form.advance,
         mode_of_payment: form.mode_of_payment,
         delivery_mode: form.delivery_mode,
         needs_fixing: form.needs_fixing,
+        is_urgent: form.is_urgent,
         status: "DESIGN",
         updated_by: user?.id,
         updated_by_name: user?.user_metadata?.full_name,
       })
       .eq("job_id", editingJob.job_id);
+
     if (error) {
       alert("❌ Failed to update job");
     } else {
@@ -100,18 +122,18 @@ export default function Attendant() {
         bill_no: "",
         date: "",
         area: "",
-        job_type: "Flex Banner",
-        description: "",
-        size: "",
-        sizes: [{ width: "", height: "" }],
-        quantity: "",
-        material: "",
-        design_file: "",
         cost: "",
         advance: "",
         mode_of_payment: "Cash",
         delivery_mode: "office",
         needs_fixing: false,
+        is_urgent: false,
+        items: [{
+          job_type: "Flex Banner",
+          description: "",
+          sizes: [{ width: "", height: "", unit: "ft", quantity: "" }],
+          material: ""
+        }]
       });
       refreshData();
     }
@@ -145,6 +167,60 @@ export default function Attendant() {
   useEffect(() => {
     refreshData();
   }, []);
+
+  // --- Item Management Helpers ---
+  const addItem = () => {
+    setForm({
+      ...form,
+      items: [...form.items, {
+        job_type: "Flex Banner",
+        description: "",
+        sizes: [{ width: "", height: "", unit: "ft", quantity: "" }],
+        material: ""
+      }]
+    });
+  };
+
+  const removeItem = (index: number) => {
+    if (form.items.length === 1) {
+      alert("At least one item is required");
+      return;
+    }
+    const items = [...form.items];
+    items.splice(index, 1);
+    setForm({ ...form, items });
+  };
+
+  const updateItem = (index: number, field: string, value: any) => {
+    const items = [...form.items];
+    items[index] = { ...items[index], [field]: value };
+    setForm({ ...form, items });
+  };
+
+  const updateItemSize = (itemIndex: number, sizeIndex: number, field: 'width' | 'height' | 'quantity', value: string) => {
+    const items = [...form.items];
+    const sizes = [...items[itemIndex].sizes];
+    sizes[sizeIndex] = { ...sizes[sizeIndex], [field]: value };
+    items[itemIndex] = { ...items[itemIndex], sizes };
+    setForm({ ...form, items });
+  };
+
+  const addItemSize = (itemIndex: number) => {
+    const items = [...form.items];
+    items[itemIndex] = {
+      ...items[itemIndex],
+      sizes: [...items[itemIndex].sizes, { width: "", height: "", unit: "ft", quantity: "" }]
+    };
+    setForm({ ...form, items });
+  };
+
+  const updateItemSizeUnit = (itemIndex: number, sizeIndex: number, unit: string) => {
+    const items = [...form.items];
+    const sizes = [...items[itemIndex].sizes];
+    sizes[sizeIndex] = { ...sizes[sizeIndex], unit };
+    items[itemIndex] = { ...items[itemIndex], sizes };
+    setForm({ ...form, items });
+  };
 
   // --- Helpers ---
   const formatDate = (dateString: string | null) => {
@@ -351,14 +427,6 @@ export default function Attendant() {
 
     doc.save(`JobSheet_${job.job_id}.pdf`);
   }
-  // --- Helpers for Preview ---
-  const activeSize = form.sizes[form.sizes.length - 1];
-  const w = parseFloat(activeSize.width || "0");
-  const h = parseFloat(activeSize.height || "0");
-  const maxPreview = 120;
-  const scale = Math.max(w, h) > 0 ? maxPreview / Math.max(w, h) : 1;
-  const previewWidth = Math.round(w * scale);
-  const previewHeight = Math.round(h * scale);
 
   // --- 🖨️ PDF Logic ---
   const generateBill = (job: Job) => {
@@ -434,9 +502,11 @@ export default function Attendant() {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
 
-    const sizeString = form.sizes
-      .filter(s => s.width && s.height)
-      .map(s => `${s.width}x${s.height}`)
+    // Use first item for backward compatibility in main jobs table
+    const firstItem = form.items[0];
+    const sizeString = firstItem.sizes
+      .filter((s: any) => s.width && s.height)
+      .map((s: any) => `${s.width}x${s.height}`)
       .join(", ");
 
     const jobPayload = {
@@ -446,17 +516,17 @@ export default function Attendant() {
       bill_no: form.bill_no,
       date: form.date,
       area: form.area,
-      job_type: form.job_type,
-      description: form.description,
+      job_type: firstItem.job_type,
+      description: firstItem.description,
       size: sizeString,
-      quantity: form.quantity,
-      material: form.material,
-      design_file: form.design_file,
+      quantity: firstItem.sizes[0]?.quantity || "",
+      material: firstItem.material,
       cost: form.cost,
       advance: form.advance,
       mode_of_payment: form.mode_of_payment,
       delivery_mode: form.delivery_mode,
       needs_fixing: form.needs_fixing,
+      is_urgent: form.is_urgent,
       status: "DESIGN",
       assigned_role: "attendant",
       updated_by: user?.id,
@@ -468,27 +538,76 @@ export default function Attendant() {
 
     if (error) {
       alert("Error: " + error.message);
-    } else {
-      const createdJob = data?.[0];
-      if (createdJob) {
-        await supabase.from("job_workflow_logs").insert({
-          job_id: createdJob.job_id,
-          role: "attendant",
-          stage: "CREATED",
-          worker_name: user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Attendant",
-          user_name: user?.email || null,
-          user_id: user?.id || null,
-          customer_name: createdJob.customer_name,
-          customer_mobile: createdJob.phone,
-          time_in: new Date().toISOString(),
-          time_out: new Date().toISOString(),
-        });
-
-      }
-      alert("Job Created Successfully!");
-      setForm({ ...form, sizes: [{ width: "", height: "" }], description: "", cost: "", advance: "", design_file: "" });
-      refreshData();
+      setLoading(false);
+      return;
     }
+
+    const createdJob = data?.[0];
+    if (createdJob) {
+      // Insert all items and their sizes into job_items table
+      const itemsToInsert: any[] = [];
+      form.items.forEach((item, itemIndex) => {
+        item.sizes.forEach((size, sizeIndex) => {
+          if (size.width && size.height) {
+            itemsToInsert.push({
+              job_id: createdJob.job_id,
+              job_type: item.job_type,
+              description: item.description,
+              size: `${size.width}x${size.height}`,
+              quantity: size.quantity || "",
+              material: item.material,
+              position: itemIndex * 100 + sizeIndex // Ensure proper ordering
+            });
+          }
+        });
+      });
+
+      const { error: itemsError } = await supabase
+        .from("job_items")
+        .insert(itemsToInsert);
+
+      if (itemsError) {
+        console.error("Error inserting job items:", itemsError);
+        // Continue even if items insert fails - main job is created
+      }
+
+      // Log workflow
+      await supabase.from("job_workflow_logs").insert({
+        job_id: createdJob.job_id,
+        role: "attendant",
+        stage: "CREATED",
+        worker_name: user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Attendant",
+        user_name: user?.email || null,
+        user_id: user?.id || null,
+        customer_name: createdJob.customer_name,
+        customer_mobile: createdJob.phone,
+        time_in: new Date().toISOString(),
+        time_out: new Date().toISOString(),
+      });
+    }
+
+    alert("Job Created Successfully!");
+    setForm({
+      customer_name: "",
+      phone: "",
+      job_card_no: "",
+      bill_no: "",
+      date: "",
+      area: "",
+      cost: "",
+      advance: "",
+      mode_of_payment: "Cash",
+      delivery_mode: "office",
+      needs_fixing: false,
+      is_urgent: false,
+      items: [{
+        job_type: "Flex Banner",
+        description: "",
+        sizes: [{ width: "", height: "", unit: "ft", quantity: "" }],
+        material: ""
+      }]
+    });
+    refreshData();
     setLoading(false);
   };
 
@@ -685,6 +804,129 @@ export default function Attendant() {
     }
   };
 
+  const requestRework = async (job: Job) => {
+    const reason = window.prompt("Enter reason for rework:");
+    if (reason === null) return; // Cancelled
+
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // 1. Find the last designer who worked on this
+      const { data: logs } = await supabase
+        .from("job_workflow_logs")
+        .select("user_id, worker_name")
+        .eq("job_id", job.job_id)
+        .eq("stage", "DESIGN")
+        .order("time_in", { ascending: false }) // Use time_in as created_at might not exist in log
+        .limit(1);
+
+      const lastDesignerId = logs?.[0]?.user_id || null;
+      const lastDesignerName = logs?.[0]?.worker_name || "Designer";
+
+      // 2. Update Job Status -> DESIGN (and assign back if we know who)
+      const { error } = await supabase
+        .from("jobs")
+        .update({
+          status: "DESIGN",
+          assigned_to: lastDesignerId, // Send back to specific designer if known
+          assigned_role: "designer",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("job_id", job.job_id);
+
+      if (error) throw error;
+
+      // 3. Log Rework Request
+      await supabase.from("job_workflow_logs").insert({
+        job_id: job.job_id,
+        stage: "REWORK_REQUESTED",
+        worker_name: user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Attendant",
+        user_name: user?.email || null,
+        user_id: user?.id || null,
+        notes: reason || "No reason provided",
+        time_in: new Date().toISOString(),
+        time_out: new Date().toISOString(),
+      });
+
+      alert(`✅ Job sent back to ${lastDesignerName} for rework.`);
+      refreshData();
+    } catch (err) {
+      console.error("Error sending for rework:", err);
+      alert("❌ Failed to send for rework");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveNewItem = async () => {
+    if (!addItemModal.jobId) return;
+    setLoading(true);
+
+    try {
+      const { job_type, description, width, height, unit, quantity, material, cost } = newItemForm;
+      const sizeStr = width && height ? `${width}x${height} ${unit}` : "";
+      const itemCost = parseFloat(cost) || 0;
+
+      // 1. Insert Item
+      const { error: itemError } = await supabase.from("job_items").insert({
+        job_id: addItemModal.jobId,
+        job_type,
+        description,
+        size: sizeStr,
+        quantity,
+        material,
+        cost: itemCost,
+        position: 999 // Append to end
+      });
+
+      if (itemError) throw itemError;
+
+      // 2. Update Job Cost (Fetch current first)
+      const { data: jobData, error: fetchError } = await supabase
+        .from("jobs")
+        .select("cost, balance")
+        .eq("job_id", addItemModal.jobId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const newTotal = (jobData.cost || 0) + itemCost;
+      const newBalance = (jobData.balance || 0) + itemCost;
+
+      const { error: updateError } = await supabase
+        .from("jobs")
+        .update({
+          cost: newTotal,
+          balance: newBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq("job_id", addItemModal.jobId);
+
+      if (updateError) throw updateError;
+
+      alert("✅ Item added and cost updated!");
+      setAddItemModal({ open: false, jobId: null });
+      setNewItemForm({
+        job_type: "Flex Banner",
+        description: "",
+        width: "",
+        height: "",
+        unit: "ft",
+        quantity: "1",
+        material: "",
+        cost: ""
+      });
+      refreshData();
+
+    } catch (err: any) {
+      console.error("Error adding item:", err);
+      alert("❌ Failed to add item: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   return (
     <div style={{ backgroundColor: "#f8fafc", minHeight: "100vh" }}>
@@ -715,44 +957,127 @@ export default function Attendant() {
                 <input style={styles.input} placeholder="Area" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
               </div>
 
-              {/* ORDER DETAILS GROUP */}
+              {/* ORDER DETAILS - MULTIPLE ITEMS */}
               <div style={styles.inputGroup}>
-                <label style={styles.label}>Order Details</label>
+                <label style={styles.label}>Order Items ({form.items.length})</label>
 
-                <label style={styles.subLabel}>Job Type:</label>
-                <select style={styles.select} value={form.job_type} onChange={(e) => setForm({ ...form, job_type: e.target.value })}>
-                  <option value="Flex Banner">Flex Banner</option>
-                  <option value="DTP">DTP</option>
-                  <option value="Fitting Work">Fitting Work</option>
-                  <option value="Vinyl">Vinyl</option>
-                </select>
+                {form.items.map((item, itemIndex) => {
+                  const itemSizes = item.sizes;
+                  const activeSize = itemSizes[itemSizes.length - 1];
+                  const w = parseFloat(activeSize.width || "0");
+                  const h = parseFloat(activeSize.height || "0");
+                  const maxPreview = 100;
+                  const scale = Math.max(w, h) > 0 ? maxPreview / Math.max(w, h) : 1;
+                  const previewWidth = Math.round(w * scale);
+                  const previewHeight = Math.round(h * scale);
 
-                <input style={styles.input} placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-
-                {/* Sizes */}
-                <div style={styles.sizeSection}>
-                  {form.sizes.map((s, index) => (
-                    <div key={index} style={{ display: "flex", gap: "10px", marginBottom: "6px" }}>
-                      <input style={styles.input} placeholder="Width" value={s.width} onChange={(e) => { const sizes = [...form.sizes]; sizes[index].width = e.target.value; setForm({ ...form, sizes }); }} />
-                      <input style={styles.input} placeholder="Height" value={s.height} onChange={(e) => { const sizes = [...form.sizes]; sizes[index].height = e.target.value; setForm({ ...form, sizes }); }} />
-                    </div>
-                  ))}
-                  <button style={styles.btnAddSize} onClick={() => setForm({ ...form, size: form.sizes.map(s => `${s.width}x${s.height}`).join(", "), sizes: [...form.sizes, { width: "", height: "" }], })}>➕ Add Size</button>
-
-                  {w > 0 && h > 0 && (
-                    <div style={styles.previewContainer}>
-                      <div style={styles.previewLabel}>Visual Preview</div>
-                      <div style={{ ...styles.previewBox, width: previewWidth, height: previewHeight }}>
-                        {w} × {h}
+                  return (
+                    <div key={itemIndex} style={styles.itemCard}>
+                      <div style={styles.itemHeader}>
+                        <span style={styles.itemNumber}>Item {itemIndex + 1}</span>
+                        {form.items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeItem(itemIndex)}
+                            style={styles.btnRemoveItem}
+                          >
+                            ✕ Remove
+                          </button>
+                        )}
                       </div>
+
+                      <label style={styles.subLabel}>Job Type:</label>
+                      <select
+                        style={styles.select}
+                        value={item.job_type}
+                        onChange={(e) => updateItem(itemIndex, "job_type", e.target.value)}
+                      >
+                        <option value="Flex Banner">Flex Banner</option>
+                        <option value="DTP">DTP</option>
+                        <option value="Fitting Work">Fitting Work</option>
+                        <option value="Vinyl">Vinyl</option>
+                      </select>
+
+                      <input
+                        style={styles.input}
+                        placeholder="Description"
+                        value={item.description}
+                        onChange={(e) => updateItem(itemIndex, "description", e.target.value)}
+                      />
+
+                      {/* Sizes */}
+                      <div style={styles.sizeSection}>
+                        <label style={styles.subLabel}>Dimensions:</label>
+                        {item.sizes.map((s, sizeIndex) => (
+                          <div key={sizeIndex} style={{ display: "flex", gap: "8px", marginBottom: "6px", alignItems: "center" }}>
+                            <input
+                              style={{ ...styles.input, marginBottom: 0, flex: 1 }}
+                              placeholder="H"
+                              value={s.height}
+                              onChange={(e) => updateItemSize(itemIndex, sizeIndex, "height", e.target.value)}
+                            />
+                            <span style={styles.dimensionSeparator}>×</span>
+                            <input
+                              style={{ ...styles.input, marginBottom: 0, flex: 1 }}
+                              placeholder="W"
+                              value={s.width}
+                              onChange={(e) => updateItemSize(itemIndex, sizeIndex, "width", e.target.value)}
+                            />
+                            <select
+                              style={styles.unitSelect}
+                              value={s.unit || "ft"}
+                              onChange={(e) => updateItemSizeUnit(itemIndex, sizeIndex, e.target.value)}
+                            >
+                              <option value="ft">ft</option>
+                              <option value="in">in</option>
+                              <option value="cm">cm</option>
+                              <option value="mm">mm</option>
+                            </select>
+                            <input
+                              style={{ ...styles.input, marginBottom: 0, width: "80px" }}
+                              placeholder="Qty"
+                              value={s.quantity || ""}
+                              onChange={(e) => updateItemSize(itemIndex, sizeIndex, "quantity", e.target.value)}
+                            />
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          style={styles.btnAddSize}
+                          onClick={() => addItemSize(itemIndex)}
+                        >
+                          ➕ Add Size
+                        </button>
+
+                        {w > 0 && h > 0 && (
+                          <div style={styles.previewContainer}>
+                            <div style={styles.previewLabel}>Visual Preview</div>
+                            <div style={{ ...styles.previewBox, width: previewWidth, height: previewHeight }}>
+                              {w} × {h}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <input
+                        style={styles.input}
+                        placeholder="Material"
+                        value={item.material}
+                        onChange={(e) => updateItem(itemIndex, "material", e.target.value)}
+                      />
                     </div>
-                  )}
-                </div>
+                  );
+                })}
 
-                <input style={styles.input} placeholder="Qty" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
-                <input style={styles.input} placeholder="Material" value={form.material} onChange={(e) => setForm({ ...form, material: e.target.value })} />
+                {/* Add More Variant Button */}
+                <button type="button" onClick={addItem} style={styles.btnAddItem}>
+                  ➕ Add More Variant
+                </button>
+              </div>
 
-                {/* Cost & Payment Row */}
+              {/* Cost & Payment Row */}
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Payment Details</label>
                 <div style={styles.row}>
                   <input style={styles.inputHalf} placeholder="Cost" type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
                   <input style={styles.inputHalf} placeholder="Advance" type="number" value={form.advance} onChange={(e) => setForm({ ...form, advance: e.target.value })} />
@@ -769,6 +1094,11 @@ export default function Attendant() {
                 <label style={styles.checkboxLabel}>
                   <input type="checkbox" checked={form.needs_fixing} onChange={(e) => setForm({ ...form, needs_fixing: e.target.checked })} />
                   Requires Fixing?
+                </label>
+
+                <label style={{ ...styles.checkboxLabel, color: "#dc2626" }}>
+                  <input type="checkbox" checked={form.is_urgent} onChange={(e) => setForm({ ...form, is_urgent: e.target.checked })} />
+                  🚨 Urgent Priority
                 </label>
               </div>
 
@@ -811,13 +1141,17 @@ export default function Attendant() {
             </div>
             <div style={styles.listArea}>
               {pickups.length === 0 && <p style={styles.emptyText}>No items waiting.</p>}
-              {pickups.map((job) => (
-                <div key={job.job_id} style={styles.card}>
+              {pickups.sort((a, b) => (b.is_urgent ? 1 : 0) - (a.is_urgent ? 1 : 0)).map((job) => (
+                <div key={job.job_id} style={job.is_urgent ? { ...styles.card, ...styles.urgentCard } : styles.card}>
                   <div style={styles.cardRow}>
-                    <span style={styles.cardTitle}>{job.customer_name}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={styles.cardTitle}>{job.customer_name}</span>
+                      {job.is_urgent && <span style={styles.urgentBadge}>URGENT</span>}
+                    </div>
                     <span style={styles.badge}>#{job.job_card_no}</span>
                   </div>
-                  <div style={styles.cardMeta}>{job.size} • {job.material}</div>
+                  <div style={styles.cardMeta}>{job.size} • {job.material} • {job.phone}</div>
+
 
                 </div>
               ))}
@@ -934,76 +1268,251 @@ export default function Attendant() {
             <div style={styles.sectionHeader}>
               <h3 style={styles.heading}>📊 Live Tracker</h3>
             </div>
+
+            {/* 🔍 Search Bar */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", backgroundColor: "#fff" }}>
+              <div style={{
+                position: "relative",
+                display: "flex",
+                alignItems: "center"
+              }}>
+                <span style={{
+                  position: "absolute",
+                  left: "12px",
+                  fontSize: "14px",
+                  color: "#94a3b8",
+                  pointerEvents: "none"
+                }}>🔍</span>
+                <input
+                  type="text"
+                  placeholder="Search by Bill No..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px 10px 36px", // Left padding for icon
+                    borderRadius: "8px",
+                    border: "1px solid #e2e8f0",
+                    fontSize: "13px",
+                    outline: "none",
+                    backgroundColor: "#f8fafc",
+                    transition: "all 0.2s ease",
+                    color: "#334155",
+                    fontWeight: 500
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#3b82f6";
+                    e.target.style.backgroundColor = "#ffffff";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(59, 130, 246, 0.1)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#e2e8f0";
+                    e.target.style.backgroundColor = "#f8fafc";
+                    e.target.style.boxShadow = "none";
+                  }}
+                />
+              </div>
+            </div>
+
             <div style={styles.trackerList}>
-              {jobs.map((job) => {
-                // Parse design files
-                const designUrls = job.design_url
-                  ? job.design_url.split(',').map(url => url.trim()).filter(Boolean)
-                  : [];
+              {jobs
+                .filter(job => {
+                  if (!searchTerm) return true;
+                  const billNo = job.bill_no?.toLowerCase() || "";
+                  const search = searchTerm.toLowerCase();
+                  return billNo.includes(search);
+                })
+                .sort((a, b) => ((b.is_urgent ? 1 : 0) - (a.is_urgent ? 1 : 0)))
+                .map((job) => {
+                  // Parse design files
+                  const designUrls = job.design_url
+                    ? job.design_url.split(',').map(url => url.trim()).filter(Boolean)
+                    : [];
 
-                return (
-                  <div key={job.job_id} style={styles.trackerItem}>
-                    <div style={{ flex: 1 }}>
-                      <div style={styles.trackerTitle}>
-                        {job.bill_no || `#${job.job_id}`}
-                        {designUrls.length > 0 && (
-                          <span style={styles.designBadge}>
-                            🎨 {designUrls.length} Design{designUrls.length > 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </div>
-                      <div style={styles.trackerSub}>{job.customer_name} • {job.job_type}</div>
+                  const itemStyle = job.is_urgent
+                    ? { ...styles.trackerItem, ...styles.urgentCard }
+                    : styles.trackerItem;
 
-                      {/* Design Files Section */}
-                      {designUrls.length > 0 && (
-                        <div style={styles.designFilesContainer}>
-                          <div style={styles.designFilesLabel}>📥 Design Files:</div>
-                          <div style={styles.designButtonsRow}>
-                            {designUrls.map((url, index) => (
-                              <a
-                                key={index}
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={styles.btnDownloadDesign}
-                              >
-                                ⬇️ Design {index + 1}
-                              </a>
-                            ))}
-                            {job.status === "DESIGN_REVIEW" && (
-                              <button
-                                onClick={() => approveDesign(job)}
-                                disabled={loading}
-                                style={styles.btnApproveDesign}
-                              >
-                                ✅ Approve Design
-                              </button>
-                            )}
-                          </div>
+                  return (
+                    <div key={job.job_id} style={itemStyle}>
+                      <div style={{ flex: 1 }}>
+                        <div style={styles.trackerTitle}>
+                          {job.bill_no || `#${job.job_id}`}
+                          {job.is_urgent && <span style={styles.urgentBadge}>URGENT</span>}
+                          {designUrls.length > 0 && (
+                            <span style={styles.designBadge}>
+                              🎨 {designUrls.length} Design{designUrls.length > 1 ? 's' : ''}
+                            </span>
+                          )}
                         </div>
-                      )}
+                        <div style={styles.trackerSub}>{job.customer_name} • {job.job_type}• {job.phone}</div>
 
-                      <button onClick={() => generateBill(job)} style={styles.btnPrint}>
-                        🖨️ Print Bill
-                      </button>
-                      <button
-                        onClick={() => downloadJobSheet(job)} style={styles.btndwn}
-                      >
-                        Download Job Sheet PDF
-                      </button>
+                        {/* Design Files Section */}
+                        {designUrls.length > 0 && (
+                          <div style={styles.designFilesContainer}>
+                            <div style={styles.designFilesLabel}>📥 Design Files:</div>
+                            <div style={styles.designButtonsRow}>
+                              {designUrls.map((url, index) => (
+                                <a
+                                  key={index}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={styles.btnDownloadDesign}
+                                >
+                                  ⬇️ Design {index + 1}
+                                </a>
+                              ))}
+                              {job.status === "DESIGN_REVIEW" && (
+                                <div style={{ display: 'flex', gap: '5px' }}>
+                                  <button
+                                    onClick={() => approveDesign(job)}
+                                    disabled={loading}
+                                    style={styles.btnApproveDesign}
+                                  >
+                                    ✅ Approve
+                                  </button>
+                                  <button
+                                    onClick={() => requestRework(job)}
+                                    disabled={loading}
+                                    style={styles.btnRework}
+                                  >
+                                    🔄 Rework
+                                  </button>
+                                  <button
+                                    onClick={() => setAddItemModal({ open: true, jobId: job.job_id })}
+                                    disabled={loading}
+                                    style={styles.btnAddItem}
+                                  >
+                                    ➕ Item
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
+                        <button onClick={() => generateBill(job)} style={styles.btnPrint}>
+                          🖨️ Print Bill
+                        </button>
+                        <button
+                          onClick={() => downloadJobSheet(job)} style={styles.btndwn}
+                        >
+                          Download Job Sheet PDF
+                        </button>
+
+                      </div>
+                      <span style={{ ...styles.statusBadge, backgroundColor: getStatusColor(job.status) }}>
+                        {job.status}
+                      </span>
                     </div>
-                    <span style={{ ...styles.statusBadge, backgroundColor: getStatusColor(job.status) }}>
-                      {job.status}
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </div>
         </div>
 
       </div>
+
+      {/* --- ADD ITEM MODAL --- */}
+      {addItemModal.open && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <div style={styles.modalHeader}>
+              <h3 style={styles.heading}>Add Extra Item</h3>
+            </div>
+
+            <div style={styles.formContainer} >
+              <label style={styles.subLabel}>Job Type:</label>
+              <select
+                style={styles.select}
+                value={newItemForm.job_type}
+                onChange={(e) => setNewItemForm({ ...newItemForm, job_type: e.target.value })}
+              >
+                <option value="Flex Banner">Flex Banner</option>
+                <option value="DTP">DTP</option>
+                <option value="Fitting Work">Fitting Work</option>
+                <option value="Vinyl">Vinyl</option>
+              </select>
+
+              <input
+                style={styles.input}
+                placeholder="Description"
+                value={newItemForm.description}
+                onChange={(e) => setNewItemForm({ ...newItemForm, description: e.target.value })}
+              />
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <input
+                  style={{ ...styles.input, flex: 1 }}
+                  placeholder="H"
+                  value={newItemForm.height}
+                  onChange={(e) => setNewItemForm({ ...newItemForm, height: e.target.value })}
+                />
+                <input
+                  style={{ ...styles.input, flex: 1 }}
+                  placeholder="W"
+                  value={newItemForm.width}
+                  onChange={(e) => setNewItemForm({ ...newItemForm, width: e.target.value })}
+                />
+                <select
+                  style={styles.unitSelect}
+                  value={newItemForm.unit}
+                  onChange={(e) => setNewItemForm({ ...newItemForm, unit: e.target.value })}
+                >
+                  <option value="ft">ft</option>
+                  <option value="in">in</option>
+                  <option value="cm">cm</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <input
+                  style={{ ...styles.input, flex: 1 }}
+                  placeholder="Material"
+                  value={newItemForm.material}
+                  onChange={(e) => setNewItemForm({ ...newItemForm, material: e.target.value })}
+                />
+                <input
+                  style={{ ...styles.input, width: '80px' }}
+                  placeholder="Qty"
+                  value={newItemForm.quantity}
+                  onChange={(e) => setNewItemForm({ ...newItemForm, quantity: e.target.value })}
+                />
+              </div>
+
+              <div style={{ marginTop: '10px', borderTop: '1px dashed #ccc', paddingTop: '10px' }}>
+                <label style={{ ...styles.subLabel, color: 'green' }}>Add Cost:</label>
+                <input
+                  style={{ ...styles.input, borderColor: 'green' }}
+                  placeholder="Extra Cost (₹)"
+                  type="number"
+                  value={newItemForm.cost}
+                  onChange={(e) => setNewItemForm({ ...newItemForm, cost: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                <button
+                  onClick={() => setAddItemModal({ open: false, jobId: null })}
+                  style={{ ...styles.btnSecondary, flex: 1 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveNewItem}
+                  disabled={loading}
+                  style={{ ...styles.btnPrimary, flex: 1 }}
+                >
+                  {loading ? "Saving..." : "Save Item"}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -1044,6 +1553,18 @@ const styles: Record<string, React.CSSProperties> = {
   btnPrimary: { width: "100%", padding: "12px", backgroundColor: "#27ae60", color: "white", border: "none", borderRadius: "6px", fontWeight: 600, cursor: "pointer", fontSize: "13px", marginTop: "10px" },
   btnSecondary: { width: "100%", padding: "12px", backgroundColor: "#8e44ad", color: "white", border: "none", borderRadius: "6px", fontWeight: 600, cursor: "pointer", fontSize: "13px", marginTop: "10px" },
   btnAddSize: { backgroundColor: "#34495e", color: "white", border: "none", padding: "8px 10px", borderRadius: "4px", fontSize: "12px", fontWeight: 600, cursor: "pointer", width: "100%", marginBottom: "10px" },
+  btnAddItem: { backgroundColor: "#2563eb", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, cursor: "pointer" },
+  btnRemoveItem: { backgroundColor: "#ef4444", color: "white", border: "none", padding: "4px 12px", borderRadius: "4px", fontSize: "11px", fontWeight: 600, cursor: "pointer" },
+
+  // Item Cards
+  itemCard: { padding: "16px", marginBottom: "16px", backgroundColor: "#f8fafc", border: "2px solid #e2e8f0", borderRadius: "8px", position: "relative" as const },
+  itemHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", paddingBottom: "8px", borderBottom: "1px solid #cbd5e1" },
+  itemNumber: { fontSize: "13px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase" as const },
+
+  // Unit Labels
+  unitLabel: { fontSize: "11px", fontWeight: 600, color: "#64748b", minWidth: "20px", textAlign: "center" as const },
+  unitSelect: { fontSize: "11px", fontWeight: 600, color: "#64748b", padding: "6px", border: "1px solid #cbd5e1", borderRadius: "4px", backgroundColor: "white", cursor: "pointer", minWidth: "50px" },
+  dimensionSeparator: { fontSize: "16px", fontWeight: 600, color: "#94a3b8", padding: "0 4px" },
 
   // Cards (Pickups/Measurements)
   listArea: { padding: "16px", maxHeight: "60vh", overflowY: "auto" },
@@ -1056,6 +1577,46 @@ const styles: Record<string, React.CSSProperties> = {
   statusPill: { fontSize: "10px", backgroundColor: "#eee", padding: "2px 5px", borderRadius: "4px" },
   btnAction: { width: "100%", marginTop: "8px", padding: "8px", backgroundColor: "#34495e", color: "white", borderRadius: "4px", border: "none", fontSize: "12px", cursor: "pointer", fontWeight: 600 },
   btnSmallAction: { width: "100%", marginTop: "8px", padding: "6px", backgroundColor: "#34495e", color: "white", borderRadius: "4px", border: "none", fontSize: "12px", cursor: "pointer", fontWeight: "bold" },
+  btnRework: {
+    padding: "4px 10px",
+    backgroundColor: "#e67e22", // Orange
+    color: "white",
+    borderRadius: "4px",
+    fontSize: "10px",
+    fontWeight: "600",
+    border: "none",
+    cursor: "pointer",
+    display: "inline-block",
+    transition: "background-color 0.2s"
+  },
+
+  // New Styles
+
+  modalOverlay: {
+    position: "fixed" as const, // Fix for type error
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000
+  },
+  modalContent: {
+    backgroundColor: "white",
+    padding: "24px",
+    borderRadius: "12px",
+    width: "400px",
+    maxWidth: "90%",
+    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)"
+  },
+  modalHeader: {
+    marginBottom: "16px",
+    borderBottom: "1px solid #e2e8f0",
+    paddingBottom: "12px"
+  },
 
   // Preview
   previewContainer: { padding: "10px", border: "1px dashed #aaa", borderRadius: "8px", backgroundColor: "#f9f9f9", textAlign: "center", marginBottom: "10px" },
@@ -1108,6 +1669,26 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     display: "inline-block",
     transition: "background-color 0.2s"
+  },
+
+  // Urgent Job Styles
+  urgentCard: {
+    borderLeft: "4px solid #ef4444",
+    backgroundColor: "#fff5f5",
+    padding: "12px",
+    borderRadius: "0 8px 8px 0",
+    marginBottom: "12px",
+    boxShadow: "0 2px 8px rgba(239, 68, 68, 0.15)",
+    borderBottom: "none"
+  },
+  urgentBadge: {
+    backgroundColor: "#ef4444",
+    color: "white",
+    padding: "2px 8px",
+    borderRadius: "12px",
+    fontSize: "10px",
+    fontWeight: 700,
+    textTransform: "uppercase" as const
   },
 
   // Misc
