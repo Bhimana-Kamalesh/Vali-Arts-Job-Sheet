@@ -4,6 +4,7 @@ import Header from "../components/Header";
 import type { Job } from "../lib/types";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { useTheme } from "../context/ThemeContext";
 
 // --- Types ---
 interface MeasurementJob {
@@ -18,6 +19,175 @@ interface MeasurementJob {
 }
 
 export default function Attendant() {
+  const { colors, theme } = useTheme();
+
+  const styles: Record<string, React.CSSProperties> = {
+    mainContainer: { display: "grid", gridTemplateColumns: "340px 320px 1fr", gap: "20px", padding: "20px", maxWidth: "1600px", margin: "0 auto", alignItems: "start" },
+    column: { display: "flex", flexDirection: "column", gap: "20px" },
+    section: { backgroundColor: colors.card, borderRadius: "12px", border: `1px solid ${colors.border}`, overflow: "hidden", transition: "box-shadow 0.3s ease", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" },
+    sectionHeader: { padding: "12px 16px", borderBottom: `1px solid ${colors.border}`, display: "flex", alignItems: "center", gap: "10px", backgroundColor: colors.background },
+    heading: { margin: 0, fontSize: "14px", fontWeight: 700, color: colors.text },
+
+    // Forms
+    formContainer: { padding: "16px" },
+    inputGroup: { marginBottom: "16px", paddingBottom: "10px", borderBottom: `1px dashed ${colors.border}` },
+    label: { fontSize: "12px", fontWeight: 700, color: colors.subText, textTransform: "uppercase", marginBottom: "8px", display: "block" },
+    subLabel: { fontSize: "11px", fontWeight: "bold", marginBottom: "4px", display: "block", color: colors.subText },
+
+    input: { width: "100%", padding: "10px", marginBottom: "10px", border: `1px solid ${colors.border}`, borderRadius: "6px", fontSize: "13px", boxSizing: "border-box", backgroundColor: colors.background, color: colors.text },
+    inputHalf: { width: "100%", padding: "10px", border: `1px solid ${colors.border}`, borderRadius: "6px", fontSize: "13px", boxSizing: "border-box", backgroundColor: colors.background, color: colors.text },
+    select: { width: "100%", padding: "10px", marginBottom: "10px", border: `1px solid ${colors.border}`, borderRadius: "6px", fontSize: "13px", backgroundColor: colors.background, color: colors.text },
+    selectHalf: { width: "100%", padding: "10px", border: `1px solid ${colors.border}`, borderRadius: "6px", fontSize: "13px", backgroundColor: colors.background, color: colors.text },
+    row: { display: "flex", gap: "8px", marginBottom: "10px" },
+
+    // Buttons
+    btnPrimary: { width: "100%", padding: "12px", backgroundColor: "#27ae60", color: "white", border: "none", borderRadius: "6px", fontWeight: 600, cursor: "pointer", fontSize: "13px", marginTop: "10px", transition: "all 0.2s ease", transform: "translateY(0)", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" },
+    btnSecondary: { width: "100%", padding: "12px", backgroundColor: "#8e44ad", color: "white", border: "none", borderRadius: "6px", fontWeight: 600, cursor: "pointer", fontSize: "13px", marginTop: "10px", transition: "all 0.2s ease", transform: "translateY(0)", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" },
+    btnAddSize: { backgroundColor: "#34495e", color: "white", border: "none", padding: "8px 10px", borderRadius: "4px", fontSize: "12px", fontWeight: 600, cursor: "pointer", width: "100%", marginBottom: "10px", transition: "all 0.2s ease", transform: "translateY(0)" },
+    btnAddItem: { backgroundColor: "#2563eb", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, cursor: "pointer", transition: "all 0.2s ease", transform: "translateY(0)" },
+    btnRemoveItem: { backgroundColor: "#ef4444", color: "white", border: "none", padding: "4px 12px", borderRadius: "4px", fontSize: "11px", fontWeight: 600, cursor: "pointer", transition: "all 0.2s ease", transform: "translateY(0)" },
+
+    // Item Cards
+    itemCard: { padding: "16px", marginBottom: "16px", backgroundColor: colors.background, border: `2px solid ${colors.border}`, borderRadius: "8px", position: "relative" as const },
+    itemHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", paddingBottom: "8px", borderBottom: `1px solid ${colors.border}` },
+    itemNumber: { fontSize: "13px", fontWeight: 700, color: colors.text, textTransform: "uppercase" as const },
+
+    // Unit Labels
+    unitLabel: { fontSize: "11px", fontWeight: 600, color: colors.subText, minWidth: "20px", textAlign: "center" as const },
+    unitSelect: { fontSize: "11px", fontWeight: 600, color: colors.text, padding: "6px", border: `1px solid ${colors.border}`, borderRadius: "4px", backgroundColor: colors.card, cursor: "pointer", minWidth: "50px" },
+    dimensionSeparator: { fontSize: "16px", fontWeight: 600, color: colors.subText, padding: "0 4px" },
+
+    // Cards
+    listArea: { padding: "16px", maxHeight: "60vh", overflowY: "auto" },
+    card: { padding: "12px", borderRadius: "8px", border: `1px solid ${colors.border}`, marginBottom: "10px", backgroundColor: colors.card, borderLeft: "4px solid #f39c12", transition: "all 0.3s ease", cursor: "default", transform: "translateY(0)", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" },
+    measurementCard: { padding: "12px", borderRadius: "8px", border: "1px solid #f3e8ff", marginBottom: "10px", backgroundColor: theme === 'dark' ? '#18181b' : "#faf5ff", borderLeft: "4px solid #8e44ad", transition: "all 0.3s ease", cursor: "default", transform: "translateY(0)", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" },
+    cardRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" },
+    cardTitle: { fontWeight: 600, fontSize: "14px", color: colors.text },
+    cardMeta: { fontSize: "12px", color: colors.subText },
+    badge: { fontSize: "12px", fontWeight: "bold", transition: "all 0.2s ease" },
+    statusPill: { fontSize: "10px", backgroundColor: colors.background, padding: "2px 5px", borderRadius: "4px", transition: "all 0.2s ease" },
+    btnAction: { width: "100%", marginTop: "8px", padding: "8px", backgroundColor: "#34495e", color: "white", borderRadius: "4px", border: "none", fontSize: "12px", cursor: "pointer", fontWeight: 600, transition: "all 0.2s ease", transform: "translateY(0)" },
+    btnSmallAction: { width: "100%", marginTop: "8px", padding: "6px", backgroundColor: "#34495e", color: "white", borderRadius: "4px", border: "none", fontSize: "12px", cursor: "pointer", fontWeight: "bold", transition: "all 0.2s ease", transform: "translateY(0)" },
+    btnRework: {
+      padding: "4px 10px",
+      backgroundColor: "#e67e22",
+      color: "white",
+      borderRadius: "4px",
+      fontSize: "10px",
+      fontWeight: "600",
+      border: "none",
+      cursor: "pointer",
+      display: "inline-block",
+      transition: "background-color 0.2s"
+    },
+
+    // Modals
+    modalOverlay: {
+      position: "fixed" as const,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 1000
+    },
+    modalContent: {
+      backgroundColor: colors.card,
+      padding: "24px",
+      borderRadius: "12px",
+      width: "400px",
+      maxWidth: "90%",
+      boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)"
+    },
+    modalHeader: {
+      marginBottom: "16px",
+      borderBottom: `1px solid ${colors.border}`,
+      paddingBottom: "12px",
+      display: "flex", justifyContent: "space-between", alignItems: "center"
+    },
+
+    // Preview
+    previewContainer: { padding: "10px", border: "1px dashed #aaa", borderRadius: "8px", backgroundColor: colors.background, textAlign: "center", marginBottom: "10px" },
+    previewLabel: { fontSize: "11px", color: colors.subText, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "1px" },
+    previewBox: { backgroundColor: "#2ecc71", border: "2px solid #27ae60", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "bold", borderRadius: "4px", margin: "0 auto" },
+    previewPanel: { marginTop: "10px", padding: "10px", backgroundColor: colors.background, borderRadius: "8px" },
+    thumb: { width: "100%", borderRadius: "6px", border: `1px solid ${colors.border}` },
+    link: { fontSize: "12px", color: "#2563eb", fontWeight: 600 },
+
+    // OTP
+    otpBox: { padding: "16px", backgroundColor: colors.card, border: "2px solid #16a34a", borderRadius: "10px" },
+    otpHeader: { margin: "0 0 10px 0", fontSize: "14px", color: colors.text, fontWeight: "bold" },
+    inputOtp: { width: "100%", padding: "10px", border: `1px solid ${colors.text}`, borderRadius: "4px", marginBottom: "8px", fontSize: "14px", backgroundColor: colors.background, color: colors.text },
+    btnVerify: { width: "100%", padding: "12px", backgroundColor: "#27ae60", color: "white", border: "none", borderRadius: "5px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" },
+
+    // Tracker
+    trackerList: { padding: "0 16px 16px", maxHeight: "75vh", overflowY: "auto" },
+    trackerItem: { padding: "10px 0", borderBottom: "1px solid #201b1b", display: "flex", alignItems: "start", justifyContent: "space-between" },
+    trackerTitle: { fontSize: "14px", fontWeight: "bold", color: colors.text },
+    trackerSub: { fontSize: "11px", color: colors.subText },
+    btnPrint: { marginTop: "5px", backgroundColor: "#333", border: "1px solid #ddd", padding: "3px 8px", borderRadius: "4px", fontSize: "11px", cursor: "pointer", color: "white", display: "flex", gap: "4px", alignItems: "center" },
+    btndwn: { marginTop: "5px", backgroundColor: "#333", border: "1px solid #ddd", padding: "3px 8px", borderRadius: "4px", fontSize: "11px", cursor: "pointer", color: "white", display: "flex", gap: "4px", alignItems: "center" },
+    statusBadge: { fontSize: "10px", padding: "4px 8px", borderRadius: "12px", color: "white", fontWeight: "bold", textTransform: "uppercase", minWidth: "70px", textAlign: "center" },
+
+    // Design Files
+    designBadge: { marginLeft: "8px", fontSize: "10px", backgroundColor: "#e0f2fe", color: "#0369a1", padding: "3px 8px", borderRadius: "12px", fontWeight: "600" },
+    designFilesContainer: { marginTop: "8px", marginBottom: "8px", padding: "8px", backgroundColor: theme === 'dark' ? '#18181b' : "#f0f9ff", borderRadius: "6px", border: "1px solid #bae6fd" },
+    designFilesLabel: { fontSize: "10px", fontWeight: "bold", color: "#0369a1", marginBottom: "6px", textTransform: "uppercase" },
+    designButtonsRow: { display: "flex", gap: "6px", flexWrap: "wrap" },
+    btnDownloadDesign: {
+      padding: "4px 10px",
+      backgroundColor: "#0ea5e9",
+      color: "white",
+      borderRadius: "4px",
+      fontSize: "10px",
+      fontWeight: "600",
+      textDecoration: "none",
+      cursor: "pointer",
+      display: "inline-block",
+      transition: "background-color 0.2s"
+    },
+    btnApproveDesign: {
+      padding: "4px 10px",
+      backgroundColor: "#10b981",
+      color: "white",
+      borderRadius: "4px",
+      fontSize: "10px",
+      fontWeight: "600",
+      border: "none",
+      cursor: "pointer",
+      display: "inline-block",
+      transition: "background-color 0.2s"
+    },
+
+    // Urgent Job Styles
+    urgentCard: {
+      borderLeft: "4px solid #ef4444",
+      backgroundColor: theme === 'dark' ? '#450a0a' : "#fff5f5",
+      padding: "12px",
+      borderRadius: "0 8px 8px 0",
+      marginBottom: "12px",
+      boxShadow: "0 2px 8px rgba(239, 68, 68, 0.15)",
+      borderBottom: "none"
+    },
+    urgentBadge: {
+      backgroundColor: "#ef4444",
+      color: "white",
+      padding: "2px 8px",
+      borderRadius: "12px",
+      fontSize: "10px",
+      fontWeight: 700,
+      textTransform: "uppercase" as const
+    },
+
+    // Misc
+    dotAvailable: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#f59e0b" },
+    dotActive: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#ef4444" },
+    checkboxLabel: { display: "flex", alignItems: "center", gap: "10px", fontSize: "12px", color: colors.subText, marginTop: "10px", fontWeight: "bold" },
+    emptyText: { textAlign: "center", fontSize: "12px", color: colors.subText, padding: "20px" }
+  };
   const [loading, setLoading] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
 
@@ -46,8 +216,7 @@ export default function Attendant() {
     cost: "",
     advance: "",
     mode_of_payment: "Cash",
-    delivery_mode: "office",
-    needs_fixing: false,
+    handover_mode: "inoffice",
     is_urgent: false,
     items: [{
       job_type: "Flex Banner",
@@ -100,9 +269,10 @@ export default function Attendant() {
         material: firstItem.material,
         cost: form.cost,
         advance: form.advance,
+        balance: (parseFloat(form.cost || "0") - parseFloat(form.advance || "0")),
         mode_of_payment: form.mode_of_payment,
-        delivery_mode: form.delivery_mode,
-        needs_fixing: form.needs_fixing,
+        delivery_mode: form.handover_mode === "delivery" || form.handover_mode === "offsite" ? "onsite" : "office",
+        needs_fixing: form.handover_mode === "fixing" || form.handover_mode === "offsite",
         is_urgent: form.is_urgent,
         status: "DESIGN",
         updated_by: user?.id,
@@ -125,8 +295,7 @@ export default function Attendant() {
         cost: "",
         advance: "",
         mode_of_payment: "Cash",
-        delivery_mode: "office",
-        needs_fixing: false,
+        handover_mode: "inoffice", // Default
         is_urgent: false,
         items: [{
           job_type: "Flex Banner",
@@ -523,9 +692,10 @@ export default function Attendant() {
       material: firstItem.material,
       cost: form.cost,
       advance: form.advance,
+      balance: (parseFloat(form.cost || "0") - parseFloat(form.advance || "0")),
       mode_of_payment: form.mode_of_payment,
-      delivery_mode: form.delivery_mode,
-      needs_fixing: form.needs_fixing,
+      delivery_mode: form.handover_mode === "delivery" || form.handover_mode === "offsite" ? "onsite" : "office",
+      needs_fixing: form.handover_mode === "fixing" || form.handover_mode === "offsite",
       is_urgent: form.is_urgent,
       status: "DESIGN",
       assigned_role: "attendant",
@@ -597,8 +767,7 @@ export default function Attendant() {
       cost: "",
       advance: "",
       mode_of_payment: "Cash",
-      delivery_mode: "office",
-      needs_fixing: false,
+      handover_mode: "inoffice",
       is_urgent: false,
       items: [{
         job_type: "Flex Banner",
@@ -860,8 +1029,20 @@ export default function Attendant() {
   };
 
   const completePickup = async (job: Job) => {
-    const confirm = window.confirm(`Confirm pickup for ${job.customer_name}?`);
-    if (!confirm) return;
+    // Calculate balance dynamically
+    const cost = parseFloat(String(job.cost || "0"));
+    const advance = parseFloat(String(job.advance || "0"));
+    const balance = cost - advance;
+
+    if (balance > 0) {
+      const confirmPayment = window.confirm(
+        `💰 Collect Pending Amount: ₹${balance}\n\nConfirm payment received for ${job.customer_name}?`
+      );
+      if (!confirmPayment) return;
+    } else {
+      const confirm = window.confirm(`Confirm pickup for ${job.customer_name}?`);
+      if (!confirm) return;
+    }
 
     setLoading(true);
     try {
@@ -871,7 +1052,9 @@ export default function Attendant() {
         .from("jobs")
         .update({
           status: "COMPLETED",
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          balance: 0,
+          advance: cost
         })
         .eq("job_id", job.job_id);
 
@@ -1124,16 +1307,14 @@ export default function Attendant() {
                     <option value="Online">Online</option>
                     <option value="Cash">Cash</option>
                   </select>
-                  <select style={styles.selectHalf} value={form.delivery_mode} onChange={(e) => setForm({ ...form, delivery_mode: e.target.value })}>
-                    <option value="office">Pickup</option>
-                    <option value="onsite">Onsite</option>
+                  <select style={styles.selectHalf} value={form.handover_mode} onChange={(e) => setForm({ ...form, handover_mode: e.target.value })}>
+                    <option value="inoffice">In-Office (Shop Pickup)</option>
+                    <option value="delivery">Delivery (Courier/Drop)</option>
+                    <option value="fixing">Fixing (In-Shop)</option>
+                    <option value="offsite">Off-Site Fixing</option>
                   </select>
                 </div>
 
-                <label style={styles.checkboxLabel}>
-                  <input type="checkbox" checked={form.needs_fixing} onChange={(e) => setForm({ ...form, needs_fixing: e.target.checked })} />
-                  Requires Fixing?
-                </label>
 
                 <label style={{ ...styles.checkboxLabel, color: "#dc2626" }}>
                   <input type="checkbox" checked={form.is_urgent} onChange={(e) => setForm({ ...form, is_urgent: e.target.checked })} />
@@ -1180,7 +1361,8 @@ export default function Attendant() {
             </div>
             <div style={styles.listArea}>
               {pickups.length === 0 && <p style={styles.emptyText}>No items waiting.</p>}
-              {pickups.sort((a, b) => (b.is_urgent ? 1 : 0) - (a.is_urgent ? 1 : 0)).map((job) => (
+              {pickups.length === 0 && <p style={styles.emptyText}>No items waiting.</p>}
+              {[...pickups].sort((a, b) => (b.is_urgent ? 1 : 0) - (a.is_urgent ? 1 : 0)).map((job) => (
                 <div key={job.job_id} style={job.is_urgent ? { ...styles.card, ...styles.urgentCard } : styles.card}>
                   <div style={styles.cardRow}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -1189,7 +1371,7 @@ export default function Attendant() {
                     </div>
                     <span style={styles.badge}>#{job.job_card_no}</span>
                   </div>
-                  <div style={styles.cardMeta}>{job.size} • {job.material} • {job.phone} • Bal: ₹{job.balance || 0}</div>
+                  <div style={styles.cardMeta}>{job.size} • {job.material} • {job.phone} • Bal: ₹{(parseFloat(job.cost as any || 0) - parseFloat(job.advance as any || 0))}</div>
 
                   <button
                     onClick={() => completePickup(job)}
@@ -1367,7 +1549,6 @@ export default function Attendant() {
                   const search = searchTerm.toLowerCase();
                   return billNo.includes(search);
                 })
-                .sort((a, b) => ((b.is_urgent ? 1 : 0) - (a.is_urgent ? 1 : 0)))
                 .map((job) => {
                   // Parse design files
                   const designUrls = job.design_url
@@ -1575,170 +1756,3 @@ const getStatusColor = (status: string) => {
   }
 };
 
-const styles: Record<string, React.CSSProperties> = {
-  mainContainer: { display: "grid", gridTemplateColumns: "340px 320px 1fr", gap: "20px", padding: "20px", maxWidth: "1600px", margin: "0 auto", alignItems: "start" },
-  column: { display: "flex", flexDirection: "column", gap: "20px" },
-  section: { backgroundColor: "white", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden" },
-  sectionHeader: { padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: "10px", backgroundColor: "#f8fafc" },
-  heading: { margin: 0, fontSize: "14px", fontWeight: 700, color: "#1e293b" },
-
-  // Forms
-  formContainer: { padding: "16px" },
-  inputGroup: { marginBottom: "16px", paddingBottom: "10px", borderBottom: "1px dashed #020202" },
-  label: { fontSize: "12px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: "8px", display: "block" },
-  subLabel: { fontSize: "11px", fontWeight: "bold", marginBottom: "4px", display: "block", color: "#555" },
-
-  input: { width: "100%", padding: "10px", marginBottom: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" },
-  inputHalf: { width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box" },
-  select: { width: "100%", padding: "10px", marginBottom: "10px", border: "1px solid #0d0d0e", borderRadius: "6px", fontSize: "13px", backgroundColor: "#414141" },
-  selectHalf: { width: "100%", padding: "10px", border: "1px solid #000000", borderRadius: "6px", fontSize: "13px", backgroundColor: "#414141" },
-  row: { display: "flex", gap: "8px", marginBottom: "10px" },
-
-  // Buttons
-  btnPrimary: { width: "100%", padding: "12px", backgroundColor: "#27ae60", color: "white", border: "none", borderRadius: "6px", fontWeight: 600, cursor: "pointer", fontSize: "13px", marginTop: "10px" },
-  btnSecondary: { width: "100%", padding: "12px", backgroundColor: "#8e44ad", color: "white", border: "none", borderRadius: "6px", fontWeight: 600, cursor: "pointer", fontSize: "13px", marginTop: "10px" },
-  btnAddSize: { backgroundColor: "#34495e", color: "white", border: "none", padding: "8px 10px", borderRadius: "4px", fontSize: "12px", fontWeight: 600, cursor: "pointer", width: "100%", marginBottom: "10px" },
-  btnAddItem: { backgroundColor: "#2563eb", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, cursor: "pointer" },
-  btnRemoveItem: { backgroundColor: "#ef4444", color: "white", border: "none", padding: "4px 12px", borderRadius: "4px", fontSize: "11px", fontWeight: 600, cursor: "pointer" },
-
-  // Item Cards
-  itemCard: { padding: "16px", marginBottom: "16px", backgroundColor: "#f8fafc", border: "2px solid #e2e8f0", borderRadius: "8px", position: "relative" as const },
-  itemHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", paddingBottom: "8px", borderBottom: "1px solid #cbd5e1" },
-  itemNumber: { fontSize: "13px", fontWeight: 700, color: "#1e293b", textTransform: "uppercase" as const },
-
-  // Unit Labels
-  unitLabel: { fontSize: "11px", fontWeight: 600, color: "#64748b", minWidth: "20px", textAlign: "center" as const },
-  unitSelect: { fontSize: "11px", fontWeight: 600, color: "#64748b", padding: "6px", border: "1px solid #cbd5e1", borderRadius: "4px", backgroundColor: "white", cursor: "pointer", minWidth: "50px" },
-  dimensionSeparator: { fontSize: "16px", fontWeight: 600, color: "#94a3b8", padding: "0 4px" },
-
-  // Cards (Pickups/Measurements)
-  listArea: { padding: "16px", maxHeight: "60vh", overflowY: "auto" },
-  card: { padding: "12px", borderRadius: "8px", border: "1px solid #e2e8f0", marginBottom: "10px", backgroundColor: "white", borderLeft: "4px solid #f39c12" },
-  measurementCard: { padding: "12px", borderRadius: "8px", border: "1px solid #f3e8ff", marginBottom: "10px", backgroundColor: "#faf5ff", borderLeft: "4px solid #8e44ad" },
-  cardRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" },
-  cardTitle: { fontWeight: 600, fontSize: "14px", color: "#334155" },
-  cardMeta: { fontSize: "12px", color: "#64748b" },
-  badge: { fontSize: "12px", fontWeight: "bold" },
-  statusPill: { fontSize: "10px", backgroundColor: "#eee", padding: "2px 5px", borderRadius: "4px" },
-  btnAction: { width: "100%", marginTop: "8px", padding: "8px", backgroundColor: "#34495e", color: "white", borderRadius: "4px", border: "none", fontSize: "12px", cursor: "pointer", fontWeight: 600 },
-  btnSmallAction: { width: "100%", marginTop: "8px", padding: "6px", backgroundColor: "#34495e", color: "white", borderRadius: "4px", border: "none", fontSize: "12px", cursor: "pointer", fontWeight: "bold" },
-  btnRework: {
-    padding: "4px 10px",
-    backgroundColor: "#e67e22", // Orange
-    color: "white",
-    borderRadius: "4px",
-    fontSize: "10px",
-    fontWeight: "600",
-    border: "none",
-    cursor: "pointer",
-    display: "inline-block",
-    transition: "background-color 0.2s"
-  },
-
-  // New Styles
-
-  modalOverlay: {
-    position: "fixed" as const, // Fix for type error
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1000
-  },
-  modalContent: {
-    backgroundColor: "white",
-    padding: "24px",
-    borderRadius: "12px",
-    width: "400px",
-    maxWidth: "90%",
-    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)"
-  },
-  modalHeader: {
-    marginBottom: "16px",
-    borderBottom: "1px solid #e2e8f0",
-    paddingBottom: "12px"
-  },
-
-  // Preview
-  previewContainer: { padding: "10px", border: "1px dashed #aaa", borderRadius: "8px", backgroundColor: "#f9f9f9", textAlign: "center", marginBottom: "10px" },
-  previewLabel: { fontSize: "11px", color: "#777", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "1px" },
-  previewBox: { backgroundColor: "#2ecc71", border: "2px solid #27ae60", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "bold", borderRadius: "4px", margin: "0 auto" },
-  previewPanel: { marginTop: "10px", padding: "10px", backgroundColor: "#f9f9f9", borderRadius: "8px" },
-  thumb: { width: "100%", borderRadius: "6px", border: "1px solid #e2e8f0" },
-  link: { fontSize: "12px", color: "#2563eb", fontWeight: 600 },
-
-  // OTP
-  otpBox: { padding: "16px", backgroundColor: "#white", border: "2px solid #16a34a", borderRadius: "10px" },
-  otpHeader: { margin: "0 0 10px 0", fontSize: "14px", color: "#333", fontWeight: "bold" },
-  inputOtp: { width: "100%", padding: "10px", border: "1px solid #000", borderRadius: "4px", marginBottom: "8px", fontSize: "14px" },
-  btnVerify: { width: "100%", padding: "12px", backgroundColor: "#27ae60", color: "white", border: "none", borderRadius: "5px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" },
-
-  // Tracker
-  trackerList: { padding: "0 16px 16px", maxHeight: "75vh", overflowY: "auto" },
-  trackerItem: { padding: "10px 0", borderBottom: "1px solid #201b1b", display: "flex", alignItems: "start", justifyContent: "space-between" },
-  trackerTitle: { fontSize: "14px", fontWeight: "bold", color: "#000" },
-  trackerSub: { fontSize: "11px", color: "#555" },
-  btnPrint: { marginTop: "5px", backgroundColor: "#333", border: "1px solid #ddd", padding: "3px 8px", borderRadius: "4px", fontSize: "11px", cursor: "pointer", color: "white", display: "flex", gap: "4px", alignItems: "center" },
-  btndwn: { marginTop: "5px", backgroundColor: "#333", border: "1px solid #ddd", padding: "3px 8px", borderRadius: "4px", fontSize: "11px", cursor: "pointer", color: "white", display: "flex", gap: "4px", alignItems: "center" },
-  statusBadge: { fontSize: "10px", padding: "4px 8px", borderRadius: "12px", color: "white", fontWeight: "bold", textTransform: "uppercase", minWidth: "70px", textAlign: "center" },
-
-  // Design Files
-  designBadge: { marginLeft: "8px", fontSize: "10px", backgroundColor: "#e0f2fe", color: "#0369a1", padding: "3px 8px", borderRadius: "12px", fontWeight: "600" },
-  designFilesContainer: { marginTop: "8px", marginBottom: "8px", padding: "8px", backgroundColor: "#f0f9ff", borderRadius: "6px", border: "1px solid #bae6fd" },
-  designFilesLabel: { fontSize: "10px", fontWeight: "bold", color: "#0369a1", marginBottom: "6px", textTransform: "uppercase" },
-  designButtonsRow: { display: "flex", gap: "6px", flexWrap: "wrap" },
-  btnDownloadDesign: {
-    padding: "4px 10px",
-    backgroundColor: "#0ea5e9",
-    color: "white",
-    borderRadius: "4px",
-    fontSize: "10px",
-    fontWeight: "600",
-    textDecoration: "none",
-    cursor: "pointer",
-    display: "inline-block",
-    transition: "background-color 0.2s"
-  },
-  btnApproveDesign: {
-    padding: "4px 10px",
-    backgroundColor: "#10b981",
-    color: "white",
-    borderRadius: "4px",
-    fontSize: "10px",
-    fontWeight: "600",
-    border: "none",
-    cursor: "pointer",
-    display: "inline-block",
-    transition: "background-color 0.2s"
-  },
-
-  // Urgent Job Styles
-  urgentCard: {
-    borderLeft: "4px solid #ef4444",
-    backgroundColor: "#fff5f5",
-    padding: "12px",
-    borderRadius: "0 8px 8px 0",
-    marginBottom: "12px",
-    boxShadow: "0 2px 8px rgba(239, 68, 68, 0.15)",
-    borderBottom: "none"
-  },
-  urgentBadge: {
-    backgroundColor: "#ef4444",
-    color: "white",
-    padding: "2px 8px",
-    borderRadius: "12px",
-    fontSize: "10px",
-    fontWeight: 700,
-    textTransform: "uppercase" as const
-  },
-
-  // Misc
-  dotAvailable: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#f59e0b" },
-  dotActive: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#ef4444" },
-  checkboxLabel: { display: "flex", alignItems: "center", gap: "10px", fontSize: "12px", color: "#555", marginTop: "10px", fontWeight: "bold" },
-  emptyText: { textAlign: "center", fontSize: "12px", color: "#999", padding: "20px" }
-};

@@ -2,42 +2,82 @@ import React, { useState } from "react";
 import { supabase } from "../lib/supabase";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const login = async () => {
+    if (!username || !password) {
+      alert("Please enter both username and password");
+      return;
+    }
+
     setLoading(true);
-    // 1. Sign in user
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
 
-    if (error) {
-      alert(error.message);
+    try {
+      // 1. Get Role and reconstruct email
+      const { data: userRecord, error: userError } = await supabase
+        .from("users")
+        .select("role") // Only select role, as email might not exist
+        .eq("username", username.trim())
+        .single();
+
+      if (userError || !userRecord) {
+        alert("User not found. Please check your username.");
+        setLoading(false);
+        return;
+      }
+
+      // Auto-reconstruct email
+      const targetEmail = `${username.trim().toLowerCase().replace(/\s+/g, '')}@valiarts.local`;
+
+      // 2. Sign in user
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: targetEmail,
+        password,
+      });
+
+      if (error) {
+        alert(error.message);
+        setLoading(false);
+        return;
+      }
+
+      // 3. Get Role (we might already have it from step 1, but best to be safe with auth user)
+      // If we got it from step 1, use it.
+      const role = userRecord?.role;
+
+      if (!role) {
+        // Fallback fetch if we logged in via email directly without step 1 success
+        const { data: profile } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", data.user.id)
+          .single();
+
+        if (!profile) {
+          alert("No role assigned");
+          return;
+        }
+        redirectUser(profile.role);
+      } else {
+        redirectUser(role);
+      }
+
+    } catch (err) {
+      console.error(err);
+      alert("An unexpected error occurred");
       setLoading(false);
-      return;
     }
+  };
 
-    // 2. Get logged in user ID
-    const userId = data.user.id;
-
-    // 3. Fetch role from users table
-    const { data: profile, error: roleError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", userId)
-      .single();
-
-    if (roleError || !profile) {
-      alert("No role assigned to this account");
-      setLoading(false);
-      return;
+  const redirectUser = (role: string) => {
+    // High-level roles go to Admin (or their specific dashboards if later created)
+    if (["developer", "manager", "general-manager", "admin"].includes(role)) {
+      window.location.href = "/admin";
+    } else {
+      window.location.href = `/${role}`;
     }
-
-    // 4. Redirect to correct dashboard
-    window.location.href = `/${profile.role}`;
   };
 
   return (
@@ -45,17 +85,18 @@ export default function Login() {
       <div style={styles.loginCard}>
         <div style={styles.logoContainer}>
           <h1 style={styles.title}>Vali Arts & Digitals</h1>
-          
+          <p style={styles.subtitle}>Staff Portal</p>
         </div>
 
         <div style={styles.inputWrapper}>
-          <label style={styles.label}>Email Address</label>
+          <label style={styles.label}>Username</label>
           <input
-            type="email"
-            placeholder="name@company.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="text"
+            placeholder="Enter your username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             style={styles.input}
+            autoCapitalize="none"
           />
         </div>
 
@@ -70,8 +111,8 @@ export default function Login() {
           />
         </div>
 
-        <button 
-          onClick={login} 
+        <button
+          onClick={login}
           disabled={loading}
           style={{
             ...styles.button,

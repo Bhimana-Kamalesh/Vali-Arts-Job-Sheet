@@ -3,8 +3,80 @@ import { supabase } from "../lib/supabase";
 import Header from "../components/Header";
 import type { Job } from "../lib/types";
 import { generateOTP } from "../utils/otp";
+import { useTheme } from "../context/ThemeContext";
 
 export default function Fixing() {
+  const { colors, theme } = useTheme();
+
+  const styles: Record<string, React.CSSProperties> = {
+    // Layouts
+    mainLayoutDesktop: { display: "grid", gridTemplateColumns: "350px 1fr", gap: "24px", padding: "24px", maxWidth: "1400px", margin: "0 auto", height: "calc(100vh - 80px)" },
+    mainLayoutMobile: { display: "block", padding: "16px", paddingBottom: "80px" },
+
+    // Containers
+    sideColumn: { backgroundColor: colors.card, borderRadius: "12px", border: `1px solid ${colors.border}`, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" },
+    workbench: { backgroundColor: colors.card, borderRadius: "12px", border: `1px solid ${colors.border}`, padding: "24px", height: "100%", overflowY: "auto", minHeight: "60vh" },
+
+    // Mobile Tabs
+    mobileTabContainer: { display: "flex", gap: "10px", padding: "0 16px 16px 16px" },
+    mobileTab: { flex: 1, padding: "12px", borderRadius: "8px", border: `1px solid ${colors.border}`, backgroundColor: colors.card, fontWeight: 600, color: colors.subText },
+    mobileTabActive: { flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #3b82f6", backgroundColor: theme === 'dark' ? '#18181b' : "#eff6ff", fontWeight: 700, color: "#2563eb" },
+
+    // List Items
+    sectionHeader: { padding: "16px 20px", borderBottom: `1px solid ${colors.border}`, display: "flex", alignItems: "center", gap: "10px" },
+    heading: { margin: 0, fontSize: "16px", fontWeight: 700, color: colors.text },
+    scrollArea: { padding: "12px", overflowY: "auto", flex: 1 },
+    card: { padding: "16px", borderRadius: "10px", backgroundColor: colors.card, border: `1px solid ${colors.border}`, marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" },
+    cardTitle: { fontWeight: 700, color: colors.text, fontSize: "15px", marginBottom: "4px" },
+    cardMeta: { fontSize: "13px", color: colors.subText },
+    instructionText: { fontSize: "11px", color: "#d97706", fontWeight: 700, marginTop: "6px", backgroundColor: "#fef3c7", display: "inline-block", padding: "2px 6px", borderRadius: "4px" },
+
+    // Active Job UI
+    activeContent: { display: "flex", flexDirection: "column", height: "100%" },
+    jobHeader: { borderBottom: `1px solid ${colors.border}`, paddingBottom: "20px", marginBottom: "20px" },
+    statusBadge: { display: 'inline-block', backgroundColor: '#f3e8ff', color: '#7e22ce', fontSize: '11px', fontWeight: 700, padding: '4px 8px', borderRadius: '4px', marginBottom: '8px' },
+    customerName: { fontSize: "24px", margin: "0 0 16px 0", color: colors.text },
+    infoGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" },
+    infoBox: { padding: "16px", borderRadius: "8px", backgroundColor: colors.background, border: `1px solid ${colors.border}` },
+    label: { display: "block", fontSize: "11px", fontWeight: 700, color: colors.subText, textTransform: "uppercase", marginBottom: "4px" },
+    description: { margin: 0, color: colors.text, fontWeight: 600, fontSize: "15px" },
+
+    // Action Boxes
+    actionBox: { backgroundColor: theme === 'dark' ? '#18181b' : "#eff6ff", padding: "20px", borderRadius: "12px", border: theme === 'dark' ? '1px solid #3f3f46' : "1px solid #dbeafe", marginTop: "20px" },
+    boxTitle: { fontSize: '16px', color: '#1e40af', marginTop: 0, marginBottom: '8px' },
+    boxText: { color: colors.text, marginBottom: "16px", lineHeight: '1.5', fontSize: '14px' },
+
+    // Buttons & Inputs
+    btnAccept: { backgroundColor: "#2563eb", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: 600, fontSize: "13px" },
+    btnDone: { padding: "16px", backgroundColor: "#10b981", color: "white", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", width: "100%", fontSize: "16px" },
+    input: { padding: "16px", borderRadius: "8px", border: `2px solid ${colors.border}`, width: "100%", fontSize: "20px", marginBottom: "16px", outline: "none", boxSizing: "border-box", textAlign: "center", letterSpacing: "4px", backgroundColor: colors.background, color: colors.text },
+    mapLink: { display: "inline-block", fontSize: "13px", fontWeight: 600, color: "#2563eb", textDecoration: "none", backgroundColor: "#eff6ff", padding: "6px 10px", borderRadius: "6px", border: "1px solid #dbeafe", marginTop: "8px" },
+    phoneLink: { display: "inline-block", fontSize: "16px", fontWeight: 700, color: "#059669", textDecoration: "none", backgroundColor: "#ecfdf5", padding: "8px 12px", borderRadius: "8px", border: "1px solid #a7f3d0", marginTop: "4px" },
+
+    // Empty States & Misc
+    emptyWorkbench: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: colors.subText, textAlign: "center" },
+    emptyIcon: { fontSize: "48px", marginBottom: "8px" },
+    emptyText: { textAlign: "center", marginTop: "40px", color: colors.subText, fontSize: "14px" },
+    badge: { backgroundColor: colors.background, padding: "2px 8px", borderRadius: "12px", fontSize: "12px", fontWeight: 600, color: colors.subText, marginLeft: "auto" },
+    dotAvailable: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#f59e0b" },
+
+    // Urgent Job Styles
+    urgentCard: {
+      borderLeft: "4px solid #ef4444",
+      backgroundColor: theme === 'dark' ? '#450a0a' : "#fff5f5",
+      boxShadow: "0 2px 8px rgba(239, 68, 68, 0.2)"
+    },
+    urgentBadge: {
+      backgroundColor: "#ef4444",
+      color: "white",
+      padding: "2px 8px",
+      borderRadius: "12px",
+      fontSize: "10px",
+      fontWeight: 700,
+      textTransform: "uppercase" as const
+    }
+  };
+
   const [available, setAvailable] = useState<Job[]>([]);
   const [myJob, setMyJob] = useState<Job | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -55,7 +127,32 @@ export default function Fixing() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+
+    // Set up real-time subscription for fixing jobs
+    const subscription = supabase
+      .channel('fixer-jobs-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'jobs',
+          // filter: 'status=eq.FIXING' // REMOVED FILTER to listen to all changes
+        },
+        (payload) => {
+          console.log('Fixer job change detected:', payload);
+          load();
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   /* ---------------- ACCEPT ---------------- */
   const accept = async (id: number) => {
@@ -223,7 +320,7 @@ export default function Fixing() {
 
   /* ---------------- UI ---------------- */
   return (
-    <div style={{ backgroundColor: "#f8fafc", minHeight: "100vh", paddingBottom: isMobile ? "80px" : "0" }}>
+    <div style={{ backgroundColor: colors.background, minHeight: "100vh", paddingBottom: isMobile ? "80px" : "0" }}>
       <Header title="Fixing & Framing" />
 
       {/* MOBILE TABS */}
@@ -255,7 +352,7 @@ export default function Fixing() {
               {available.length === 0 ? (
                 <div style={styles.emptyText}>No fixing jobs pending.</div>
               ) : (
-                available.sort((a, b) => (b.is_urgent ? 1 : 0) - (a.is_urgent ? 1 : 0)).map(j => (
+                [...available].sort((a, b) => (b.is_urgent ? 1 : 0) - (a.is_urgent ? 1 : 0)).map(j => (
                   <div key={j.job_id} style={j.is_urgent ? { ...styles.card, ...styles.urgentCard } : styles.card}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -398,72 +495,3 @@ export default function Fixing() {
 }
 
 /* ---------------- STYLES ---------------- */
-
-const styles: Record<string, React.CSSProperties> = {
-  // Layouts
-  mainLayoutDesktop: { display: "grid", gridTemplateColumns: "350px 1fr", gap: "24px", padding: "24px", maxWidth: "1400px", margin: "0 auto", height: "calc(100vh - 80px)" },
-  mainLayoutMobile: { display: "block", padding: "16px", paddingBottom: "80px" },
-
-  // Containers
-  sideColumn: { backgroundColor: "white", borderRadius: "12px", border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" },
-  workbench: { backgroundColor: "white", borderRadius: "12px", border: "1px solid #e2e8f0", padding: "24px", height: "100%", overflowY: "auto", minHeight: "60vh" },
-
-  // Mobile Tabs
-  mobileTabContainer: { display: "flex", gap: "10px", padding: "0 16px 16px 16px" },
-  mobileTab: { flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #cbd5e1", backgroundColor: "white", fontWeight: 600, color: "#64748b" },
-  mobileTabActive: { flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #3b82f6", backgroundColor: "#eff6ff", fontWeight: 700, color: "#2563eb" },
-
-  // List Items
-  sectionHeader: { padding: "16px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: "10px" },
-  heading: { margin: 0, fontSize: "16px", fontWeight: 700, color: "#1e293b" },
-  scrollArea: { padding: "12px", overflowY: "auto", flex: 1 },
-  card: { padding: "16px", borderRadius: "10px", backgroundColor: "#fff", border: "1px solid #e2e8f0", marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" },
-  cardTitle: { fontWeight: 700, color: "#0f172a", fontSize: "15px", marginBottom: "4px" },
-  cardMeta: { fontSize: "13px", color: "#64748b" },
-  instructionText: { fontSize: "11px", color: "#d97706", fontWeight: 700, marginTop: "6px", backgroundColor: "#fef3c7", display: "inline-block", padding: "2px 6px", borderRadius: "4px" },
-
-  // Active Job UI
-  activeContent: { display: "flex", flexDirection: "column", height: "100%" },
-  jobHeader: { borderBottom: "1px solid #f1f5f9", paddingBottom: "20px", marginBottom: "20px" },
-  statusBadge: { display: 'inline-block', backgroundColor: '#f3e8ff', color: '#7e22ce', fontSize: '11px', fontWeight: 700, padding: '4px 8px', borderRadius: '4px', marginBottom: '8px' },
-  customerName: { fontSize: "24px", margin: "0 0 16px 0", color: "#1e293b" },
-  infoGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" },
-  infoBox: { padding: "16px", borderRadius: "8px", backgroundColor: "#f8fafc", border: "1px solid #e2e8f0" },
-  label: { display: "block", fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: "4px" },
-  description: { margin: 0, color: "#0f172a", fontWeight: 600, fontSize: "15px" },
-
-  // Action Boxes
-  actionBox: { backgroundColor: "#eff6ff", padding: "20px", borderRadius: "12px", border: "1px solid #dbeafe", marginTop: "20px" },
-  boxTitle: { fontSize: '16px', color: '#1e40af', marginTop: 0, marginBottom: '8px' },
-  boxText: { color: "#334155", marginBottom: "16px", lineHeight: '1.5', fontSize: '14px' },
-
-  // Buttons & Inputs
-  btnAccept: { backgroundColor: "#2563eb", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: 600, fontSize: "13px" },
-  btnDone: { padding: "16px", backgroundColor: "#10b981", color: "white", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer", width: "100%", fontSize: "16px" },
-  input: { padding: "16px", borderRadius: "8px", border: "2px solid #cbd5e1", width: "100%", fontSize: "20px", marginBottom: "16px", outline: "none", boxSizing: "border-box", textAlign: "center", letterSpacing: "4px" },
-  mapLink: { display: "inline-block", fontSize: "13px", fontWeight: 600, color: "#2563eb", textDecoration: "none", backgroundColor: "#eff6ff", padding: "6px 10px", borderRadius: "6px", border: "1px solid #dbeafe", marginTop: "8px" },
-  phoneLink: { display: "inline-block", fontSize: "16px", fontWeight: 700, color: "#059669", textDecoration: "none", backgroundColor: "#ecfdf5", padding: "8px 12px", borderRadius: "8px", border: "1px solid #a7f3d0", marginTop: "4px" },
-
-  // Empty States & Misc
-  emptyWorkbench: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#94a3b8", textAlign: "center" },
-  emptyIcon: { fontSize: "48px", marginBottom: "8px" },
-  emptyText: { textAlign: "center", marginTop: "40px", color: "#94a3b8", fontSize: "14px" },
-  badge: { backgroundColor: "#f1f5f9", padding: "2px 8px", borderRadius: "12px", fontSize: "12px", fontWeight: 600, color: "#475569", marginLeft: "auto" },
-  dotAvailable: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#f59e0b" },
-
-  // Urgent Job Styles
-  urgentCard: {
-    borderLeft: "4px solid #ef4444",
-    backgroundColor: "#fff5f5",
-    boxShadow: "0 2px 8px rgba(239, 68, 68, 0.2)"
-  },
-  urgentBadge: {
-    backgroundColor: "#ef4444",
-    color: "white",
-    padding: "2px 8px",
-    borderRadius: "12px",
-    fontSize: "10px",
-    fontWeight: 700,
-    textTransform: "uppercase" as const
-  }
-};

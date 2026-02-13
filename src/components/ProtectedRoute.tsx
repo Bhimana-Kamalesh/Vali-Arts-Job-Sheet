@@ -16,13 +16,27 @@ export default function ProtectedRoute({ role, children }: any) {
         .eq("id", auth.user.id)
         .single();
 
-      setOk(user?.role === role);
+      if (!user) return setOk(false);
+
+      // Developers and Managers have access to everything
+      if (["developer", "manager", "general-manager"].includes(user.role)) {
+        return setOk(true);
+      }
+
+      // Check if user's role matches the required role
+      // If 'role' prop is an array, check if user.role is in it
+      if (Array.isArray(role)) {
+        setOk(role.includes(user.role));
+      } else {
+        // Single role check
+        setOk(user.role === role);
+      }
     };
 
     check();
   }, []);
 
-  if (ok === null) return <p>Loading...</p>;
+  if (ok === null) return <div style={{ height: "100vh", display: "flex", justifyContent: "center", alignItems: "center", color: "#64748b" }}>Verifying Access...</div>;
   if (!ok) return <Navigate to="/" />;
 
   return children;

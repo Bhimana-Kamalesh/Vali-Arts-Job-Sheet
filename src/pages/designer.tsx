@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import Header from "../components/Header";
 import type { Job, JobItem } from "../lib/types";
+import { useTheme } from "../context/ThemeContext";
 
 // Define interface for images to avoid TS errors
 interface MeasurementFile {
@@ -11,6 +12,161 @@ interface MeasurementFile {
 }
 
 export default function Designer() {
+  const { colors, theme } = useTheme();
+
+  const styles: Record<string, React.CSSProperties> = {
+    mainLayout: {
+      display: "grid",
+      gridTemplateColumns: "350px 1fr",
+      gap: "24px",
+      padding: "24px",
+      maxWidth: "1400px",
+      margin: "0 auto",
+    },
+    queueSidebar: {
+      backgroundColor: colors.card,
+      borderRadius: "12px",
+      border: `1px solid ${colors.border}`,
+      display: "flex",
+      flexDirection: "column",
+      height: "calc(100vh - 120px)",
+      overflow: "hidden",
+    },
+    workbench: {
+      backgroundColor: colors.card,
+      borderRadius: "12px",
+      border: `1px solid ${colors.border}`,
+      padding: "24px",
+      height: "calc(100vh - 120px)",
+      overflowY: "auto",
+    },
+    sectionHeader: {
+      padding: "20px",
+      borderBottom: `1px solid ${colors.border}`,
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+    },
+    heading: { margin: 0, fontSize: "16px", fontWeight: 700, color: colors.text },
+    scrollArea: { padding: "12px", overflowY: "auto", flex: 1 },
+    card: {
+      padding: "16px",
+      borderRadius: "10px",
+      backgroundColor: colors.card,
+      border: `1px solid ${colors.border}`,
+      marginBottom: "12px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      transition: "transform 0.1s ease",
+      boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+    },
+    cardTitle: { fontWeight: 600, color: colors.text, fontSize: "14px" },
+    cardMeta: { fontSize: "12px", color: colors.subText, marginTop: "4px" },
+    btnAccept: {
+      backgroundColor: "#eff6ff",
+      color: "#2563eb",
+      border: "none",
+      padding: "8px 12px",
+      borderRadius: "6px",
+      fontSize: "12px",
+      fontWeight: 600,
+      cursor: "pointer",
+    },
+    activeContent: { display: "flex", flexDirection: "column", gap: "24px" },
+    jobDetailsHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
+    customerName: { margin: 0, fontSize: "24px", color: colors.text },
+    idBadge: { fontSize: "12px", color: colors.subText, fontWeight: 500 },
+    statusTag: { backgroundColor: "#fef3c7", color: "#92400e", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: 700 },
+    infoGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" },
+    infoBox: { padding: "16px", borderRadius: "8px", backgroundColor: colors.background, border: `1px solid ${colors.border}` },
+
+    // Item Display Styles
+    itemsSection: { marginBottom: "20px" },
+    sectionLabel: { display: "block", fontSize: "14px", fontWeight: 700, color: colors.text, marginBottom: "16px", textTransform: "uppercase" as const },
+    designFilesContainer: { marginTop: "8px", marginBottom: "8px", padding: "8px", backgroundColor: theme === 'dark' ? '#262626' : "#f5f5f5", borderRadius: "6px", border: `1px solid ${colors.border}` },
+    itemCard: { padding: "16px", marginBottom: "16px", backgroundColor: colors.background, border: `2px solid ${colors.border}`, borderRadius: "8px" },
+    itemHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", paddingBottom: "8px", borderBottom: `1px solid ${colors.border}` },
+    itemNumber: { fontSize: "13px", fontWeight: 700, color: colors.subText, textTransform: "uppercase" as const },
+    itemType: { fontSize: "12px", fontWeight: 600, color: "#2563eb", backgroundColor: "#eff6ff", padding: "4px 10px", borderRadius: "12px" },
+    infoRow: { marginBottom: "12px" },
+    label: { display: "block", fontSize: "12px", fontWeight: 700, color: colors.subText, textTransform: "uppercase", marginBottom: "8px" },
+    description: { margin: 0, color: colors.text, lineHeight: "1.5" },
+    previewContainer: { display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "10px" },
+    previewItem: { display: 'flex', alignItems: 'center' },
+    previewBox: {
+      background: "#dcfce7",
+      border: "2px solid #22c55e",
+      borderRadius: "6px",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      color: "#166534",
+      fontWeight: 700,
+      fontSize: "11px",
+      boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
+    },
+    // New Styles for Image Grid
+    imageGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
+      gap: "12px",
+      marginTop: "10px"
+    },
+    measurementThumb: {
+      width: "100%",
+      height: "100px",
+      objectFit: "cover",
+      borderRadius: "6px",
+      border: `1px solid ${colors.border}`,
+      cursor: "pointer",
+      transition: "opacity 0.2s"
+    },
+    uploadSection: { marginTop: "20px", padding: "24px", border: `2px dashed ${colors.border}`, borderRadius: "12px" },
+    fileInputWrapper: { position: "relative", marginBottom: "20px" },
+    fileInput: { opacity: 0, width: "100%", height: "80px", cursor: "pointer" },
+    fileLabel: {
+      position: "absolute",
+      top: 0, left: 0, right: 0, bottom: 0,
+      display: "flex", justifyContent: "center", alignItems: "center",
+      backgroundColor: colors.card, color: colors.subText, borderRadius: "8px", border: `1px solid ${colors.border}`,
+      pointerEvents: "none", fontSize: "14px"
+    },
+    btnDone: {
+      width: "100%",
+      padding: "16px",
+      backgroundColor: "#10b981",
+      color: "white",
+      border: "none",
+      borderRadius: "8px",
+      fontWeight: 700,
+      cursor: "pointer",
+      boxShadow: "0 4px 12px rgba(16, 185, 129, 0.2)",
+    },
+    btnDoneDisabled: { backgroundColor: colors.border, width: "100%", padding: "16px", borderRadius: "8px", color: colors.subText, border: "none" },
+    emptyWorkbench: { textAlign: "center", padding: "60px 20px", color: colors.subText },
+    emptyIcon: { fontSize: "48px", marginBottom: "16px" },
+    badge: { backgroundColor: colors.background, color: colors.subText, padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 700 },
+    dotAvailable: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#f59e0b" },
+    dotActive: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#2563eb" },
+    emptyText: { textAlign: "center", fontSize: "13px", color: colors.subText, marginTop: "40px" },
+
+    // Urgent Job Styles
+    urgentCard: {
+      borderLeft: "4px solid #ef4444",
+      backgroundColor: theme === 'dark' ? '#450a0a' : "#fff5f5",
+      boxShadow: "0 2px 8px rgba(239, 68, 68, 0.2)"
+    },
+    urgentBadge: {
+      backgroundColor: "#ef4444",
+      color: "white",
+      padding: "2px 8px",
+      borderRadius: "12px",
+      fontSize: "10px",
+      fontWeight: 700,
+      textTransform: "uppercase" as const
+    }
+  };
   const [available, setAvailable] = useState<Job[]>([]);
   const [myJob, setMyJob] = useState<Job | null>(null);
   const [jobItems, setJobItems] = useState<JobItem[]>([]);
@@ -105,6 +261,30 @@ export default function Designer() {
 
   useEffect(() => {
     load();
+
+    // Set up real-time subscription for jobs table
+    const subscription = supabase
+      .channel('designer-jobs-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'jobs',
+          // filter: 'status=eq.DESIGN' // REMOVED FILTER to listen to all changes
+        },
+        (payload) => {
+          console.log('Job change detected:', payload);
+          // Reload data when a job is inserted or updated
+          load();
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // FIXED: Logic to load images based on myJob
@@ -223,7 +403,7 @@ export default function Designer() {
   /* ---------------- UI ---------------- */
 
   return (
-    <div style={{ backgroundColor: "#f8fafc", minHeight: "100vh" }}>
+    <div style={{ backgroundColor: colors.background, minHeight: "100vh" }}>
       <Header title="Designer Portal" />
 
       <div style={styles.mainLayout}>
@@ -239,7 +419,10 @@ export default function Designer() {
             {available.length === 0 && (
               <p style={styles.emptyText}>No jobs waiting in the queue.</p>
             )}
-            {available.sort((a, b) => (b.is_urgent ? 1 : 0) - (a.is_urgent ? 1 : 0)).map(j => (
+            {available.length === 0 && (
+              <p style={styles.emptyText}>No jobs waiting in the queue.</p>
+            )}
+            {[...available].sort((a, b) => (b.is_urgent ? 1 : 0) - (a.is_urgent ? 1 : 0)).map(j => (
               <div key={j.job_id} style={j.is_urgent ? { ...styles.card, ...styles.urgentCard } : styles.card}>
                 <div style={styles.cardInfo}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -401,155 +584,3 @@ export default function Designer() {
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  mainLayout: {
-    display: "grid",
-    gridTemplateColumns: "350px 1fr",
-    gap: "24px",
-    padding: "24px",
-    maxWidth: "1400px",
-    margin: "0 auto",
-  },
-  queueSidebar: {
-    backgroundColor: "white",
-    borderRadius: "12px",
-    border: "1px solid #e2e8f0",
-    display: "flex",
-    flexDirection: "column",
-    height: "calc(100vh - 120px)",
-    overflow: "hidden",
-  },
-  workbench: {
-    backgroundColor: "white",
-    borderRadius: "12px",
-    border: "1px solid #e2e8f0",
-    padding: "24px",
-    height: "calc(100vh - 120px)",
-    overflowY: "auto",
-  },
-  sectionHeader: {
-    padding: "20px",
-    borderBottom: "1px solid #f1f5f9",
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-  },
-  heading: { margin: 0, fontSize: "16px", fontWeight: 700, color: "#1e293b" },
-  scrollArea: { padding: "12px", overflowY: "auto", flex: 1 },
-  card: {
-    padding: "16px",
-    borderRadius: "10px",
-    backgroundColor: "#fff",
-    border: "1px solid #f1f5f9",
-    marginBottom: "12px",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    transition: "transform 0.1s ease",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
-  },
-  cardTitle: { fontWeight: 600, color: "#334155", fontSize: "14px" },
-  cardMeta: { fontSize: "12px", color: "#64748b", marginTop: "4px" },
-  btnAccept: {
-    backgroundColor: "#eff6ff",
-    color: "#2563eb",
-    border: "none",
-    padding: "8px 12px",
-    borderRadius: "6px",
-    fontSize: "12px",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-  activeContent: { display: "flex", flexDirection: "column", gap: "24px" },
-  jobDetailsHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
-  customerName: { margin: 0, fontSize: "24px", color: "#0f172a" },
-  idBadge: { fontSize: "12px", color: "#94a3b8", fontWeight: 500 },
-  statusTag: { backgroundColor: "#fef3c7", color: "#92400e", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: 700 },
-  infoGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" },
-  infoBox: { padding: "16px", borderRadius: "8px", backgroundColor: "#f8fafc", border: "1px solid #f1f5f9" },
-
-  // Item Display Styles
-  itemsSection: { marginBottom: "20px" },
-  sectionLabel: { display: "block", fontSize: "14px", fontWeight: 700, color: "#1e293b", marginBottom: "16px", textTransform: "uppercase" as const },
-  itemCard: { padding: "16px", marginBottom: "16px", backgroundColor: "#f8fafc", border: "2px solid #e2e8f0", borderRadius: "8px" },
-  itemHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", paddingBottom: "8px", borderBottom: "1px solid #cbd5e1" },
-  itemNumber: { fontSize: "13px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" as const },
-  itemType: { fontSize: "12px", fontWeight: 600, color: "#2563eb", backgroundColor: "#eff6ff", padding: "4px 10px", borderRadius: "12px" },
-  infoRow: { marginBottom: "12px" },
-  label: { display: "block", fontSize: "12px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: "8px" },
-  description: { margin: 0, color: "#334155", lineHeight: "1.5" },
-  previewContainer: { display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "10px" },
-  previewItem: { display: 'flex', alignItems: 'center' },
-  previewBox: {
-    background: "#dcfce7",
-    border: "2px solid #22c55e",
-    borderRadius: "6px",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    color: "#166534",
-    fontWeight: 700,
-    fontSize: "11px",
-    boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
-  },
-  // New Styles for Image Grid
-  imageGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
-    gap: "12px",
-    marginTop: "10px"
-  },
-  measurementThumb: {
-    width: "100%",
-    height: "100px",
-    objectFit: "cover",
-    borderRadius: "6px",
-    border: "1px solid #e2e8f0",
-    cursor: "pointer",
-    transition: "opacity 0.2s"
-  },
-  uploadSection: { marginTop: "20px", padding: "24px", border: "2px dashed #e2e8f0", borderRadius: "12px" },
-  fileInputWrapper: { position: "relative", marginBottom: "20px" },
-  fileInput: { opacity: 0, width: "100%", height: "80px", cursor: "pointer" },
-  fileLabel: {
-    position: "absolute",
-    top: 0, left: 0, right: 0, bottom: 0,
-    display: "flex", justifyContent: "center", alignItems: "center",
-    backgroundColor: "#fff", color: "#64748b", borderRadius: "8px", border: "1px solid #e2e8f0",
-    pointerEvents: "none", fontSize: "14px"
-  },
-  btnDone: {
-    width: "100%",
-    padding: "16px",
-    backgroundColor: "#10b981",
-    color: "white",
-    border: "none",
-    borderRadius: "8px",
-    fontWeight: 700,
-    cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(16, 185, 129, 0.2)",
-  },
-  btnDoneDisabled: { backgroundColor: "#cbd5e1", width: "100%", padding: "16px", borderRadius: "8px", color: "#94a3b8", border: "none" },
-  emptyWorkbench: { textAlign: "center", padding: "60px 20px", color: "#94a3b8" },
-  emptyIcon: { fontSize: "48px", marginBottom: "16px" },
-  badge: { backgroundColor: "#f1f5f9", color: "#475569", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 700 },
-  dotAvailable: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#f59e0b" },
-  dotActive: { width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#2563eb" },
-  emptyText: { textAlign: "center", fontSize: "13px", color: "#94a3b8", marginTop: "40px" },
-
-  // Urgent Job Styles
-  urgentCard: {
-    borderLeft: "4px solid #ef4444",
-    backgroundColor: "#fff5f5",
-    boxShadow: "0 2px 8px rgba(239, 68, 68, 0.2)"
-  },
-  urgentBadge: {
-    backgroundColor: "#ef4444",
-    color: "white",
-    padding: "2px 8px",
-    borderRadius: "12px",
-    fontSize: "10px",
-    fontWeight: 700,
-    textTransform: "uppercase" as const
-  }
-};
