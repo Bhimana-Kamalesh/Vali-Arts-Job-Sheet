@@ -4,23 +4,7 @@ import Header from "../components/Header";
 import { generateOTP } from "../utils/otp";
 import { useTheme } from "../context/ThemeContext";
 
-// Define Types locally for safety
-type Job = {
-  job_id: number;
-  customer_name: string;
-  phone: string;
-  area: string;
-  status: string;
-  delivery_mode: string;
-  assigned_to: string | null;
-  otp_code: string | null;
-  otp_verified: boolean;
-  otp_generated_at: string | null;
-  otp_attempts: number;
-  is_urgent?: boolean;
-  cost?: string;
-  advance?: string;
-};
+import type { Job } from "../lib/types";
 
 export default function Delivery() {
   const { colors, theme } = useTheme();
@@ -347,8 +331,8 @@ export default function Delivery() {
 
     // ✅ Payment Check
     // Calculate balance dynamically as (cost - advance)
-    const total = parseFloat(myJob.cost || "0");
-    const adv = parseFloat(myJob.advance || "0");
+    const total = Number(myJob.cost) || 0;
+    const adv = Number(myJob.advance) || 0;
     const due = total - adv;
 
     if (due > 0) {
@@ -368,7 +352,7 @@ export default function Delivery() {
       status: "COMPLETED",
       assigned_to: null,
       assigned_role: null,
-      advance: total.toString(), // Auto-mark as fully paid (advance = total cost)
+      advance: total, // Auto-mark as fully paid
       balance: 0
     }).eq("job_id", jobId);
 
@@ -481,7 +465,7 @@ export default function Delivery() {
 
                     <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', color: '#c2410c', fontWeight: 'bold', fontSize: '18px', display: 'flex', justifyContent: 'space-between' }}>
                       <span>Pending Balance:</span>
-                      <span>₹{parseFloat(myJob.cost || "0") - parseFloat(myJob.advance || "0")}</span>
+                      <span>₹{Number(myJob.cost || 0) - Number(myJob.advance || 0)}</span>
                     </div>
                   </div>
                 </div>

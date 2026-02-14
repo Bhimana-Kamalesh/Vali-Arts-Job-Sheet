@@ -53,6 +53,12 @@ export interface Job {
 
   // 🆕 Multiple items support
   items?: JobItem[];
+
+  // 🔐 OTP & Security
+  otp_code?: string | null;
+  otp_verified?: boolean;
+  otp_generated_at?: string | null;
+  otp_attempts?: number;
 }
 
 export interface User {

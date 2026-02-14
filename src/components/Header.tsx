@@ -59,7 +59,7 @@ export default function Header({ title }: { title: string }) {
           }}
           title="Toggle Theme"
         >
-          {theme === "light" ? "🌙" : "☀️"}
+          {theme === "light" ? "🌙" : "🔆"}
         </button>
         <button
           onClick={logout}

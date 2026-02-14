@@ -356,7 +356,7 @@ export default function Fixing() {
                   <div key={j.job_id} style={j.is_urgent ? { ...styles.card, ...styles.urgentCard } : styles.card}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <div style={styles.cardTitle}>{j.bill_no}</div>
+                        <div style={styles.cardTitle}>{j.bill_no} • {j.area} | {j.phone}</div>
                         {j.is_urgent && <span style={styles.urgentBadge}>URGENT</span>}
                       </div>
                       <div style={styles.cardMeta}>{j.size || "Unknown Size"}</div>

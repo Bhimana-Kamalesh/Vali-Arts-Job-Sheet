@@ -16,6 +16,32 @@ const BriefcaseIcon = () => (
 const UsersIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#8b5cf6" }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
 );
+const CheckCircleIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#22c55e" }}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+);
+
+// Module Icons
+const UserCheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#3b82f6" }}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><polyline points="17 11 19 13 23 9"></polyline></svg>;
+const CreditCardIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#10b981" }}><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>;
+const PenToolIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#8b5cf6" }}><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>;
+const PrinterIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#f59e0b" }}><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>;
+const WrenchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#ef4444" }}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>;
+const TruckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#6366f1" }}><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>;
+const RulerIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#ec4899" }}><path d="M21 6H3"></path><path d="M10 12H3"></path><path d="M10 18H3"></path><path d="M14 6v12"></path><path d="M8 6v12"></path><path d="M17 6v12"></path></svg>;
+
+const ModuleCard = ({ title, desc, icon, path, styles }: { title: string, desc: string, icon: React.ReactNode, path: string, styles: any }) => (
+  <div
+    onClick={() => window.location.href = path}
+    style={{ ...styles.metricCard, cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', flexDirection: 'column', gap: '12px' }}
+    className="job-card"
+  >
+    <div style={{ ...styles.iconBox, width: 'fit-content', padding: '12px' }}>{icon}</div>
+    <div>
+      <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: '700', color: styles.heading.color }}>{title}</h3>
+      <p style={{ margin: 0, fontSize: '13px', color: styles.subText.color }}>{desc}</p>
+    </div>
+  </div>
+);
 
 // Sub-components for cleaner code
 const MetricCard = ({ label, value, icon, styles }: { label: string, value: string | number, icon: React.ReactNode, styles: any }) => (
@@ -245,11 +271,18 @@ export default function Admin() {
             styles={styles}
           />
           <MetricCard
+            label="Total Jobs Completed"
+            value={jobs.filter(j => j.status === "COMPLETED" || j.status === "Delivered").length}
+            icon={<CheckCircleIcon />}
+            styles={styles}
+          />
+          <MetricCard
             label="Total Staff"
             value={staff.length}
             icon={<UsersIcon />}
             styles={styles}
           />
+
         </div>
 
         {/* QUICK NAVIGATION */}
@@ -257,13 +290,56 @@ export default function Admin() {
           <div style={styles.sectionHeader}>
             <h3 style={styles.heading}>Apps & Modules</h3>
           </div>
-          <div style={styles.gridRow}>
-            <button style={styles.navButton} onClick={() => window.location.href = '/attendant'}>Attendant Dashboard</button>
-            <button style={styles.navButton} onClick={() => window.location.href = '/billing'}>Billing System</button>
-            <button style={styles.navButton} onClick={() => window.location.href = '/designer'}>Designer Workflow</button>
-            <button style={styles.navButton} onClick={() => window.location.href = '/printer'}>Printer Queue</button>
-            <button style={styles.navButton} onClick={() => window.location.href = '/workshop'}>Workshop (Fixer)</button>
-            <button style={styles.navButton} onClick={() => window.location.href = '/delivery'}>Delivery Portal</button>
+          <div style={{ ...styles.gridRow, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", padding: "24px" }}>
+            <ModuleCard
+              title="Attendant"
+              desc="New jobs, office pickups & fixing"
+              icon={<UserCheckIcon />}
+              path="/attendant"
+              styles={styles}
+            />
+            <ModuleCard
+              title="Billing"
+              desc="Invoicing & payments"
+              icon={<CreditCardIcon />}
+              path="/billing"
+              styles={styles}
+            />
+            <ModuleCard
+              title="Designer"
+              desc="Design workflow & approval"
+              icon={<PenToolIcon />}
+              path="/designer"
+              styles={styles}
+            />
+            <ModuleCard
+              title="Printer"
+              desc="Print queue management"
+              icon={<PrinterIcon />}
+              path="/printer"
+              styles={styles}
+            />
+            <ModuleCard
+              title="Workshop"
+              desc="Fixing & frame work"
+              icon={<WrenchIcon />}
+              path="/fixer"
+              styles={styles}
+            />
+            <ModuleCard
+              title="Delivery"
+              desc="Onsite delivery & logistics"
+              icon={<TruckIcon />}
+              path="/delivery"
+              styles={styles}
+            />
+            <ModuleCard
+              title="Measurement"
+              desc="Onsite measurements"
+              icon={<RulerIcon />}
+              path="/measurement-jobs"
+              styles={styles}
+            />
           </div>
         </div>
 

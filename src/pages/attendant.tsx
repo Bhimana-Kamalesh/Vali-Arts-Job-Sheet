@@ -18,13 +18,22 @@ interface MeasurementJob {
   created_at: string;
 }
 
+interface PricingConfig {
+  id: number;
+  category: string;
+  product_name: string;
+  price: number;
+  unit_type: 'sqft' | 'piece';
+  min_quantity: number;
+}
+
 export default function Attendant() {
   const { colors, theme } = useTheme();
 
   const styles: Record<string, React.CSSProperties> = {
     mainContainer: { display: "grid", gridTemplateColumns: "340px 320px 1fr", gap: "20px", padding: "20px", maxWidth: "1600px", margin: "0 auto", alignItems: "start" },
     column: { display: "flex", flexDirection: "column", gap: "20px" },
-    section: { backgroundColor: colors.card, borderRadius: "12px", border: `1px solid ${colors.border}`, overflow: "hidden", transition: "box-shadow 0.3s ease", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" },
+    section: { backgroundColor: theme === 'dark' ? '#18181b' : colors.card, borderRadius: "12px", border: `1px solid ${colors.border}`, overflow: "hidden", transition: "box-shadow 0.3s ease", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" },
     sectionHeader: { padding: "12px 16px", borderBottom: `1px solid ${colors.border}`, display: "flex", alignItems: "center", gap: "10px", backgroundColor: colors.background },
     heading: { margin: 0, fontSize: "14px", fontWeight: 700, color: colors.text },
 
@@ -43,12 +52,12 @@ export default function Attendant() {
     // Buttons
     btnPrimary: { width: "100%", padding: "12px", backgroundColor: "#27ae60", color: "white", border: "none", borderRadius: "6px", fontWeight: 600, cursor: "pointer", fontSize: "13px", marginTop: "10px", transition: "all 0.2s ease", transform: "translateY(0)", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" },
     btnSecondary: { width: "100%", padding: "12px", backgroundColor: "#8e44ad", color: "white", border: "none", borderRadius: "6px", fontWeight: 600, cursor: "pointer", fontSize: "13px", marginTop: "10px", transition: "all 0.2s ease", transform: "translateY(0)", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" },
-    btnAddSize: { backgroundColor: "#34495e", color: "white", border: "none", padding: "8px 10px", borderRadius: "4px", fontSize: "12px", fontWeight: 600, cursor: "pointer", width: "100%", marginBottom: "10px", transition: "all 0.2s ease", transform: "translateY(0)" },
+    btnAddSize: { backgroundColor: theme === 'dark' ? '#3f3f46' : "#34495e", color: "white", border: "none", padding: "8px 10px", borderRadius: "4px", fontSize: "12px", fontWeight: 600, cursor: "pointer", width: "100%", marginBottom: "10px", transition: "all 0.2s ease", transform: "translateY(0)" },
     btnAddItem: { backgroundColor: "#2563eb", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, cursor: "pointer", transition: "all 0.2s ease", transform: "translateY(0)" },
     btnRemoveItem: { backgroundColor: "#ef4444", color: "white", border: "none", padding: "4px 12px", borderRadius: "4px", fontSize: "11px", fontWeight: 600, cursor: "pointer", transition: "all 0.2s ease", transform: "translateY(0)" },
 
     // Item Cards
-    itemCard: { padding: "16px", marginBottom: "16px", backgroundColor: colors.background, border: `2px solid ${colors.border}`, borderRadius: "8px", position: "relative" as const },
+    itemCard: { padding: "16px", marginBottom: "16px", backgroundColor: theme === 'dark' ? '#09090b' : colors.background, border: `2px solid ${colors.border}`, borderRadius: "8px", position: "relative" as const },
     itemHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", paddingBottom: "8px", borderBottom: `1px solid ${colors.border}` },
     itemNumber: { fontSize: "13px", fontWeight: 700, color: colors.text, textTransform: "uppercase" as const },
 
@@ -59,15 +68,15 @@ export default function Attendant() {
 
     // Cards
     listArea: { padding: "16px", maxHeight: "60vh", overflowY: "auto" },
-    card: { padding: "12px", borderRadius: "8px", border: `1px solid ${colors.border}`, marginBottom: "10px", backgroundColor: colors.card, borderLeft: "4px solid #f39c12", transition: "all 0.3s ease", cursor: "default", transform: "translateY(0)", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" },
-    measurementCard: { padding: "12px", borderRadius: "8px", border: "1px solid #f3e8ff", marginBottom: "10px", backgroundColor: theme === 'dark' ? '#18181b' : "#faf5ff", borderLeft: "4px solid #8e44ad", transition: "all 0.3s ease", cursor: "default", transform: "translateY(0)", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" },
+    card: { padding: "12px", borderRadius: "8px", border: `1px solid ${colors.border}`, marginBottom: "10px", backgroundColor: theme === 'dark' ? '#27272a' : colors.card, borderLeft: "4px solid #f39c12", transition: "all 0.3s ease", cursor: "default", transform: "translateY(0)", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" },
+    measurementCard: { padding: "12px", borderRadius: "8px", border: theme === 'dark' ? `1px solid ${colors.border}` : "1px solid #f3e8ff", marginBottom: "10px", backgroundColor: theme === 'dark' ? '#27272a' : "#faf5ff", borderLeft: "4px solid #8e44ad", transition: "all 0.3s ease", cursor: "default", transform: "translateY(0)", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" },
     cardRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" },
     cardTitle: { fontWeight: 600, fontSize: "14px", color: colors.text },
     cardMeta: { fontSize: "12px", color: colors.subText },
     badge: { fontSize: "12px", fontWeight: "bold", transition: "all 0.2s ease" },
     statusPill: { fontSize: "10px", backgroundColor: colors.background, padding: "2px 5px", borderRadius: "4px", transition: "all 0.2s ease" },
-    btnAction: { width: "100%", marginTop: "8px", padding: "8px", backgroundColor: "#34495e", color: "white", borderRadius: "4px", border: "none", fontSize: "12px", cursor: "pointer", fontWeight: 600, transition: "all 0.2s ease", transform: "translateY(0)" },
-    btnSmallAction: { width: "100%", marginTop: "8px", padding: "6px", backgroundColor: "#34495e", color: "white", borderRadius: "4px", border: "none", fontSize: "12px", cursor: "pointer", fontWeight: "bold", transition: "all 0.2s ease", transform: "translateY(0)" },
+    btnAction: { width: "100%", marginTop: "8px", padding: "8px", backgroundColor: theme === 'dark' ? '#3f3f46' : "#34495e", color: "white", borderRadius: "4px", border: "none", fontSize: "12px", cursor: "pointer", fontWeight: 600, transition: "all 0.2s ease", transform: "translateY(0)" },
+    btnSmallAction: { width: "100%", marginTop: "8px", padding: "6px", backgroundColor: theme === 'dark' ? '#3f3f46' : "#34495e", color: "white", borderRadius: "4px", border: "none", fontSize: "12px", cursor: "pointer", fontWeight: "bold", transition: "all 0.2s ease", transform: "translateY(0)" },
     btnRework: {
       padding: "4px 10px",
       backgroundColor: "#e67e22",
@@ -110,7 +119,7 @@ export default function Attendant() {
     },
 
     // Preview
-    previewContainer: { padding: "10px", border: "1px dashed #aaa", borderRadius: "8px", backgroundColor: colors.background, textAlign: "center", marginBottom: "10px" },
+    previewContainer: { padding: "10px", border: `1px dashed ${colors.border}`, borderRadius: "8px", backgroundColor: colors.background, textAlign: "center", marginBottom: "10px" },
     previewLabel: { fontSize: "11px", color: colors.subText, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "1px" },
     previewBox: { backgroundColor: "#2ecc71", border: "2px solid #27ae60", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "bold", borderRadius: "4px", margin: "0 auto" },
     previewPanel: { marginTop: "10px", padding: "10px", backgroundColor: colors.background, borderRadius: "8px" },
@@ -120,21 +129,21 @@ export default function Attendant() {
     // OTP
     otpBox: { padding: "16px", backgroundColor: colors.card, border: "2px solid #16a34a", borderRadius: "10px" },
     otpHeader: { margin: "0 0 10px 0", fontSize: "14px", color: colors.text, fontWeight: "bold" },
-    inputOtp: { width: "100%", padding: "10px", border: `1px solid ${colors.text}`, borderRadius: "4px", marginBottom: "8px", fontSize: "14px", backgroundColor: colors.background, color: colors.text },
+    inputOtp: { width: "100%", padding: "10px", border: `1px solid ${colors.border}`, borderRadius: "4px", marginBottom: "8px", fontSize: "14px", backgroundColor: colors.background, color: colors.text },
     btnVerify: { width: "100%", padding: "12px", backgroundColor: "#27ae60", color: "white", border: "none", borderRadius: "5px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" },
 
     // Tracker
     trackerList: { padding: "0 16px 16px", maxHeight: "75vh", overflowY: "auto" },
-    trackerItem: { padding: "10px 0", borderBottom: "1px solid #201b1b", display: "flex", alignItems: "start", justifyContent: "space-between" },
+    trackerItem: { padding: "10px 0", borderBottom: `1px solid ${colors.border}`, display: "flex", alignItems: "start", justifyContent: "space-between" },
     trackerTitle: { fontSize: "14px", fontWeight: "bold", color: colors.text },
     trackerSub: { fontSize: "11px", color: colors.subText },
-    btnPrint: { marginTop: "5px", backgroundColor: "#333", border: "1px solid #ddd", padding: "3px 8px", borderRadius: "4px", fontSize: "11px", cursor: "pointer", color: "white", display: "flex", gap: "4px", alignItems: "center" },
-    btndwn: { marginTop: "5px", backgroundColor: "#333", border: "1px solid #ddd", padding: "3px 8px", borderRadius: "4px", fontSize: "11px", cursor: "pointer", color: "white", display: "flex", gap: "4px", alignItems: "center" },
+    btnPrint: { marginTop: "5px", backgroundColor: theme === 'dark' ? '#3f3f46' : "#333", border: `1px solid ${colors.border}`, padding: "3px 8px", borderRadius: "4px", fontSize: "11px", cursor: "pointer", color: "white", display: "flex", gap: "4px", alignItems: "center" },
+    btndwn: { marginTop: "5px", backgroundColor: theme === 'dark' ? '#3f3f46' : "#333", border: `1px solid ${colors.border}`, padding: "3px 8px", borderRadius: "4px", fontSize: "11px", cursor: "pointer", color: "white", display: "flex", gap: "4px", alignItems: "center" },
     statusBadge: { fontSize: "10px", padding: "4px 8px", borderRadius: "12px", color: "white", fontWeight: "bold", textTransform: "uppercase", minWidth: "70px", textAlign: "center" },
 
     // Design Files
     designBadge: { marginLeft: "8px", fontSize: "10px", backgroundColor: "#e0f2fe", color: "#0369a1", padding: "3px 8px", borderRadius: "12px", fontWeight: "600" },
-    designFilesContainer: { marginTop: "8px", marginBottom: "8px", padding: "8px", backgroundColor: theme === 'dark' ? '#18181b' : "#f0f9ff", borderRadius: "6px", border: "1px solid #bae6fd" },
+    designFilesContainer: { marginTop: "8px", marginBottom: "8px", padding: "8px", backgroundColor: theme === 'dark' ? '#18181b' : "#f0f9ff", borderRadius: "6px", border: theme === 'dark' ? `1px solid ${colors.border}` : "1px solid #bae6fd" },
     designFilesLabel: { fontSize: "10px", fontWeight: "bold", color: "#0369a1", marginBottom: "6px", textTransform: "uppercase" },
     designButtonsRow: { display: "flex", gap: "6px", flexWrap: "wrap" },
     btnDownloadDesign: {
@@ -218,11 +227,11 @@ export default function Attendant() {
     mode_of_payment: "Cash",
     handover_mode: "inoffice",
     is_urgent: false,
+    design_fee: "",
     items: [{
       job_type: "Flex Banner",
       description: "",
-      sizes: [{ width: "", height: "", unit: "ft", quantity: "" }],
-      material: ""
+      sizes: [{ width: "", height: "", unit: "ft", quantity: "", material: "" }],
     }]
   });
 
@@ -240,6 +249,7 @@ export default function Attendant() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedMeasurement, setSelectedMeasurement] = useState<MeasurementJob | null>(null);
   const [measurementFiles, setMeasurementFiles] = useState<any[]>([]);
+  const [pricingData, setPricingData] = useState<PricingConfig[]>([]);
 
   // 🆕 Search State
   const [searchTerm, setSearchTerm] = useState("");
@@ -266,10 +276,11 @@ export default function Attendant() {
         description: firstItem.description,
         size: sizeString,
         quantity: firstItem.sizes[0]?.quantity || "",
-        material: firstItem.material,
+        // @ts-ignore
+        material: firstItem.sizes[0]?.material || "",
         cost: form.cost,
         advance: form.advance,
-        balance: (parseFloat(form.cost || "0") - parseFloat(form.advance || "0")),
+        balance: Number(form.cost || 0) - Number(form.advance || 0),
         mode_of_payment: form.mode_of_payment,
         delivery_mode: form.handover_mode === "delivery" || form.handover_mode === "offsite" ? "onsite" : "office",
         needs_fixing: form.handover_mode === "fixing" || form.handover_mode === "offsite",
@@ -282,30 +293,63 @@ export default function Attendant() {
 
     if (error) {
       alert("❌ Failed to update job");
-    } else {
-      alert("✅ Job sent to Designer");
-      setEditingJob(null);
-      setForm({
-        customer_name: "",
-        phone: "",
-        job_card_no: "",
-        bill_no: "",
-        date: "",
-        area: "",
-        cost: "",
-        advance: "",
-        mode_of_payment: "Cash",
-        handover_mode: "inoffice", // Default
-        is_urgent: false,
-        items: [{
-          job_type: "Flex Banner",
-          description: "",
-          sizes: [{ width: "", height: "", unit: "ft", quantity: "" }],
-          material: ""
-        }]
-      });
-      refreshData();
+      setLoading(false);
+      return;
     }
+
+    // --- Sync Job Items ---
+    // 1. Delete existing items
+    await supabase.from("job_items").delete().eq("job_id", editingJob.job_id);
+
+    // 2. Insert new items with calculated cost
+    const itemsToInsert: any[] = [];
+    form.items.forEach((item, itemIndex) => {
+      item.sizes.forEach((size, sizeIndex) => {
+        if (size.width && size.height) {
+          itemsToInsert.push({
+            job_id: editingJob.job_id,
+            job_type: item.job_type,
+            description: item.description,
+            size: `${size.width}x${size.height}`,
+            quantity: size.quantity || "",
+            // @ts-ignore
+            material: size.material || "",
+            cost: calculateCostForSize(item.job_type, size),
+            position: itemIndex * 100 + sizeIndex
+          });
+        }
+      });
+    });
+
+    if (itemsToInsert.length > 0) {
+      const { error: itemsError } = await supabase.from("job_items").insert(itemsToInsert);
+      if (itemsError) console.error("Failed to update items:", itemsError);
+    }
+
+    alert("✅ Job updated successfully");
+    setEditingJob(null);
+    setForm({
+      customer_name: "",
+      phone: "",
+      job_card_no: "",
+      bill_no: "",
+      date: "",
+      area: "",
+      cost: "",
+      advance: "",
+      mode_of_payment: "Cash",
+      handover_mode: "inoffice", // Default
+      is_urgent: false,
+      design_fee: "",
+      items: [{
+        job_type: "Flex Banner",
+        description: "",
+        sizes: [{ width: "", height: "", unit: "ft", quantity: "", material: "" }],
+      }]
+    });
+    refreshData();
+    fetchNextJobDetails();
+
     setLoading(false);
   };
 
@@ -328,13 +372,60 @@ export default function Attendant() {
       .order("created_at", { ascending: false })
       .limit(50);
 
+    const { data: pricing } = await supabase
+      .from("pricing_config")
+      .select("*")
+      .order("category", { ascending: true });
+
     setPickups(office || []);
     setMeasurementJobs(measurements || []);
     setJobs(all || []);
+    if (pricing) setPricingData(pricing);
+  };
+
+  const fetchNextJobDetails = async () => {
+    // 1. Set Date
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD for input type="date"
+
+    // 2. Job Card No (Reset daily)
+    const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+    const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+
+    const { count } = await supabase
+      .from("jobs")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", startOfDay)
+      .lte("created_at", endOfDay);
+
+    const nextJobCardNo = (count || 0) + 1;
+
+    // 3. Bill No (Continuous)
+    const { data: lastJob } = await supabase
+      .from("jobs")
+      .select("bill_no")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    let nextBillNo = 1;
+    if (lastJob && lastJob.length > 0 && lastJob[0].bill_no) {
+      const lastBill = parseInt(lastJob[0].bill_no);
+      if (!isNaN(lastBill)) {
+        nextBillNo = lastBill + 1;
+      }
+    }
+
+    setForm(prev => ({
+      ...prev,
+      date: dateStr,
+      job_card_no: nextJobCardNo.toString(),
+      bill_no: nextBillNo.toString()
+    }));
   };
 
   useEffect(() => {
     refreshData();
+    fetchNextJobDetails();
   }, []);
 
   // --- Item Management Helpers ---
@@ -344,8 +435,7 @@ export default function Attendant() {
       items: [...form.items, {
         job_type: "Flex Banner",
         description: "",
-        sizes: [{ width: "", height: "", unit: "ft", quantity: "" }],
-        material: ""
+        sizes: [{ width: "", height: "", unit: "ft", quantity: "", material: "" }],
       }]
     });
   };
@@ -366,7 +456,7 @@ export default function Attendant() {
     setForm({ ...form, items });
   };
 
-  const updateItemSize = (itemIndex: number, sizeIndex: number, field: 'width' | 'height' | 'quantity', value: string) => {
+  const updateItemSize = (itemIndex: number, sizeIndex: number, field: 'width' | 'height' | 'quantity' | 'material', value: string) => {
     const items = [...form.items];
     const sizes = [...items[itemIndex].sizes];
     sizes[sizeIndex] = { ...sizes[sizeIndex], [field]: value };
@@ -378,7 +468,7 @@ export default function Attendant() {
     const items = [...form.items];
     items[itemIndex] = {
       ...items[itemIndex],
-      sizes: [...items[itemIndex].sizes, { width: "", height: "", unit: "ft", quantity: "" }]
+      sizes: [...items[itemIndex].sizes, { width: "", height: "", unit: "ft", quantity: "", material: "" }]
     };
     setForm({ ...form, items });
   };
@@ -390,6 +480,70 @@ export default function Attendant() {
     items[itemIndex] = { ...items[itemIndex], sizes };
     setForm({ ...form, items });
   };
+
+  // --- Pricing Logic ---
+  // --- Pricing Logic ---
+  // Calculate cost for a single size entry
+  const calculateCostForSize = (itemType: string, size: any) => {
+    // Handle "Flex Banner" -> "Flex" alias for legacy support/default
+    const category = itemType === "Flex Banner" ? "Flex" : itemType;
+
+    // @ts-ignore
+    const mat = size.material;
+    if (!mat) return 0;
+
+    const pricingEntry = pricingData.find(p => p.category === category && p.product_name === mat);
+
+    if (pricingEntry) {
+      let itemCost = 0;
+      const qty = parseFloat(size.quantity) || 0;
+
+      if (pricingEntry.unit_type === 'sqft') {
+        let w = parseFloat(size.width) || 0;
+        let h = parseFloat(size.height) || 0;
+
+        if (size.unit === 'in') { w /= 12; h /= 12; }
+        if (size.unit === 'cm') { w /= 30.48; h /= 30.48; }
+        if (size.unit === 'mm') { w /= 304.8; h /= 304.8; }
+
+        const area = w * h;
+        itemCost = (area * pricingEntry.price) * qty;
+      } else if (pricingEntry.unit_type === 'piece') {
+        const applicableQty = Math.max(qty, pricingEntry.min_quantity);
+        itemCost = applicableQty * pricingEntry.price;
+      }
+      return Math.round(itemCost); // Return rounded cost per item
+    }
+    return 0;
+  };
+
+  const calculateTotalCost = () => {
+    let total = 0;
+    form.items.forEach(item => {
+      const category = item.job_type;
+      item.sizes.forEach(size => {
+        total += calculateCostForSize(category, size);
+      });
+    });
+    // @ts-ignore
+    const designFee = parseFloat(form.design_fee) || 0;
+    return Math.round(total + designFee);
+  };
+
+  // Auto-calculate cost when items change
+  useEffect(() => {
+    const calculated = calculateTotalCost();
+    // Update if calculated is different from current cost, OR if current cost is empty but calculated is valid
+    // Allowing 0 is important if user removes items
+    if (calculated >= 0 || (form.cost === "" && calculated === 0)) {
+      // Only update if strictly different to avoid loop (though useEffect dep prevents it mostly)
+      const current = parseFloat(form.cost) || 0;
+      if (current !== calculated) {
+        setForm(prev => ({ ...prev, cost: calculated.toString() }));
+      }
+    }
+    // @ts-ignore
+  }, [form.items, pricingData, form.design_fee]);
 
   // --- Helpers ---
   const formatDate = (dateString: string | null) => {
@@ -689,10 +843,11 @@ export default function Attendant() {
       description: firstItem.description,
       size: sizeString,
       quantity: firstItem.sizes[0]?.quantity || "",
-      material: firstItem.material,
+      // @ts-ignore
+      material: firstItem.sizes[0]?.material || "",
       cost: form.cost,
       advance: form.advance,
-      balance: (parseFloat(form.cost || "0") - parseFloat(form.advance || "0")),
+      balance: Number(form.cost || 0) - Number(form.advance || 0),
       mode_of_payment: form.mode_of_payment,
       delivery_mode: form.handover_mode === "delivery" || form.handover_mode === "offsite" ? "onsite" : "office",
       needs_fixing: form.handover_mode === "fixing" || form.handover_mode === "offsite",
@@ -725,7 +880,9 @@ export default function Attendant() {
               description: item.description,
               size: `${size.width}x${size.height}`,
               quantity: size.quantity || "",
-              material: item.material,
+              // @ts-ignore
+              material: size.material || "", // Removed item.material fallback as it's deprecated
+              cost: calculateCostForSize(item.job_type, size), // Calculate and save cost
               position: itemIndex * 100 + sizeIndex // Ensure proper ordering
             });
           }
@@ -769,14 +926,15 @@ export default function Attendant() {
       mode_of_payment: "Cash",
       handover_mode: "inoffice",
       is_urgent: false,
+      design_fee: "",
       items: [{
         job_type: "Flex Banner",
         description: "",
-        sizes: [{ width: "", height: "", unit: "ft", quantity: "" }],
-        material: ""
+        sizes: [{ width: "", height: "", unit: "ft", quantity: "", material: "" }]
       }]
     });
     refreshData();
+    fetchNextJobDetails();
     setLoading(false);
   };
 
@@ -1030,8 +1188,8 @@ export default function Attendant() {
 
   const completePickup = async (job: Job) => {
     // Calculate balance dynamically
-    const cost = parseFloat(String(job.cost || "0"));
-    const advance = parseFloat(String(job.advance || "0"));
+    const cost = Number(job.cost) || 0;
+    const advance = Number(job.advance) || 0;
     const balance = cost - advance;
 
     if (balance > 0) {
@@ -1151,7 +1309,21 @@ export default function Attendant() {
 
 
   return (
-    <div style={{ backgroundColor: "#f8fafc", minHeight: "100vh" }}>
+    <div style={{ backgroundColor: theme === 'dark' ? '#0c0a09' : "#f8fafc", minHeight: "100vh" }}>
+      <style>
+        {`
+          /* Hide scrollbar for Chrome, Safari and Opera */
+          input[type=number]::-webkit-inner-spin-button, 
+          input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+          }
+          /* Hide scrollbar for Firefox */
+          input[type=number] {
+            -moz-appearance: textfield;
+          }
+        `}
+      </style>
       <Header title="Attendant Dashboard" />
 
       <div style={styles.mainContainer}>
@@ -1173,7 +1345,7 @@ export default function Attendant() {
                 <label style={styles.label}>Customer Details</label>
                 <input style={styles.input} placeholder="Job Card No" value={form.job_card_no} onChange={(e) => setForm({ ...form, job_card_no: e.target.value })} />
                 <input style={styles.input} placeholder="Bill No" value={form.bill_no} onChange={(e) => setForm({ ...form, bill_no: e.target.value })} />
-                <input style={styles.input} placeholder="Date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                <input style={styles.input} type="date" placeholder="Date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
                 <input style={styles.input} placeholder="Customer Name" value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} />
                 <input style={styles.input} placeholder="Phone No" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
                 <input style={styles.input} placeholder="Area" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
@@ -1212,12 +1384,26 @@ export default function Attendant() {
                       <select
                         style={styles.select}
                         value={item.job_type}
-                        onChange={(e) => updateItem(itemIndex, "job_type", e.target.value)}
+                        onChange={(e) => {
+                          const newType = e.target.value;
+                          // Reset material when type changes to prevent invalid combinations
+                          const items = [...form.items];
+                          items[itemIndex] = {
+                            ...items[itemIndex],
+                            job_type: newType,
+                            // material removed from item level
+                          };
+                          setForm({ ...form, items });
+                        }}
                       >
                         <option value="Flex Banner">Flex Banner</option>
+                        {/* Dynamic Categories */}
+                        {Array.from(new Set(pricingData.map(p => p.category))).map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                        {/* Fallbacks if not in DB */}
                         <option value="DTP">DTP</option>
                         <option value="Fitting Work">Fitting Work</option>
-                        <option value="Vinyl">Vinyl</option>
                       </select>
 
                       <input
@@ -1229,38 +1415,64 @@ export default function Attendant() {
 
                       {/* Sizes */}
                       <div style={styles.sizeSection}>
-                        <label style={styles.subLabel}>Dimensions:</label>
+                        <label style={styles.subLabel}>Dimensions & Material:</label>
                         {item.sizes.map((s, sizeIndex) => (
-                          <div key={sizeIndex} style={{ display: "flex", gap: "8px", marginBottom: "6px", alignItems: "center" }}>
-                            <input
-                              style={{ ...styles.input, marginBottom: 0, flex: 1 }}
-                              placeholder="H"
-                              value={s.height}
-                              onChange={(e) => updateItemSize(itemIndex, sizeIndex, "height", e.target.value)}
-                            />
-                            <span style={styles.dimensionSeparator}>×</span>
-                            <input
-                              style={{ ...styles.input, marginBottom: 0, flex: 1 }}
-                              placeholder="W"
-                              value={s.width}
-                              onChange={(e) => updateItemSize(itemIndex, sizeIndex, "width", e.target.value)}
-                            />
+                          <div key={sizeIndex} style={{
+                            marginBottom: "10px",
+                            padding: "8px",
+                            border: "1px dashed #cbd5e1",
+                            borderRadius: "6px",
+                            backgroundColor: "#f1f5f9"
+                          }}>
+                            {/* Row 1: Dimensions */}
+                            <div style={{ display: "flex", gap: "8px", marginBottom: "6px", alignItems: "center" }}>
+                              <input
+                                style={{ ...styles.input, marginBottom: 0, flex: 1 }}
+                                placeholder="H"
+                                value={s.height}
+                                onChange={(e) => updateItemSize(itemIndex, sizeIndex, "height", e.target.value)}
+                              />
+                              <span style={styles.dimensionSeparator}>×</span>
+                              <input
+                                style={{ ...styles.input, marginBottom: 0, flex: 1 }}
+                                placeholder="W"
+                                value={s.width}
+                                onChange={(e) => updateItemSize(itemIndex, sizeIndex, "width", e.target.value)}
+                              />
+                              <select
+                                style={styles.unitSelect}
+                                value={s.unit || "ft"}
+                                onChange={(e) => updateItemSizeUnit(itemIndex, sizeIndex, e.target.value)}
+                              >
+                                <option value="ft">ft</option>
+                                <option value="in">in</option>
+                                <option value="cm">cm</option>
+                                <option value="mm">mm</option>
+                              </select>
+                              <input
+                                style={{ ...styles.input, marginBottom: 0, width: "60px" }}
+                                placeholder="Qty"
+                                value={s.quantity || ""}
+                                onChange={(e) => updateItemSize(itemIndex, sizeIndex, "quantity", e.target.value)}
+                              />
+                            </div>
+
+                            {/* Row 2: Material Selection */}
                             <select
-                              style={styles.unitSelect}
-                              value={s.unit || "ft"}
-                              onChange={(e) => updateItemSizeUnit(itemIndex, sizeIndex, e.target.value)}
+                              style={{ ...styles.select, marginBottom: 0 }}
+                              // @ts-ignore
+                              value={s.material || ""}
+                              onChange={(e) => updateItemSize(itemIndex, sizeIndex, "material", e.target.value)}
                             >
-                              <option value="ft">ft</option>
-                              <option value="in">in</option>
-                              <option value="cm">cm</option>
-                              <option value="mm">mm</option>
+                              <option value="">-- Select Material --</option>
+                              {pricingData
+                                .filter(p => p.category === item.job_type || (item.job_type === "Flex Banner" && p.category === "Flex"))
+                                .map(p => (
+                                  <option key={p.id} value={p.product_name}>
+                                    {p.product_name} - ₹{p.price}/{p.unit_type === 'sqft' ? 'sft' : 'pc'}
+                                  </option>
+                                ))}
                             </select>
-                            <input
-                              style={{ ...styles.input, marginBottom: 0, width: "80px" }}
-                              placeholder="Qty"
-                              value={s.quantity || ""}
-                              onChange={(e) => updateItemSize(itemIndex, sizeIndex, "quantity", e.target.value)}
-                            />
                           </div>
                         ))}
                         <button
@@ -1280,13 +1492,6 @@ export default function Attendant() {
                           </div>
                         )}
                       </div>
-
-                      <input
-                        style={styles.input}
-                        placeholder="Material"
-                        value={item.material}
-                        onChange={(e) => updateItem(itemIndex, "material", e.target.value)}
-                      />
                     </div>
                   );
                 })}
@@ -1300,26 +1505,51 @@ export default function Attendant() {
               {/* Cost & Payment Row */}
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Payment Details</label>
-                <div style={styles.row}>
-                  <input style={styles.inputHalf} placeholder="Cost" type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
-                  <input style={styles.inputHalf} placeholder="Advance" type="number" value={form.advance} onChange={(e) => setForm({ ...form, advance: e.target.value })} />
-                  <select style={styles.selectHalf} value={form.mode_of_payment} onChange={(e) => setForm({ ...form, mode_of_payment: e.target.value })}>
-                    <option value="Online">Online</option>
-                    <option value="Cash">Cash</option>
-                  </select>
-                  <select style={styles.selectHalf} value={form.handover_mode} onChange={(e) => setForm({ ...form, handover_mode: e.target.value })}>
-                    <option value="inoffice">In-Office (Shop Pickup)</option>
-                    <option value="delivery">Delivery (Courier/Drop)</option>
-                    <option value="fixing">Fixing (In-Shop)</option>
-                    <option value="offsite">Off-Site Fixing</option>
-                  </select>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+
+                  {/* Row 1: Financials */}
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={styles.subLabel}>Cost</label>
+                      <input style={{ ...styles.input, marginBottom: 0 }} placeholder="0" type="number" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={styles.subLabel}>D. Fee</label>
+                      {/* @ts-ignore */}
+                      <input style={{ ...styles.input, marginBottom: 0 }} placeholder="0" type="number" value={form.design_fee} onChange={(e) => setForm({ ...form, design_fee: e.target.value })} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={styles.subLabel}>Advance</label>
+                      <input style={{ ...styles.input, marginBottom: 0 }} placeholder="0" type="number" value={form.advance} onChange={(e) => setForm({ ...form, advance: e.target.value })} />
+                    </div>
+                  </div>
+
+                  {/* Row 2: Modes & Urgent */}
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={styles.subLabel}>Payment Mode</label>
+                      <select style={{ ...styles.select, marginBottom: 0 }} value={form.mode_of_payment} onChange={(e) => setForm({ ...form, mode_of_payment: e.target.value })}>
+                        <option value="Online">Online</option>
+                        <option value="Cash">Cash</option>
+                      </select>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={styles.subLabel}>Handover</label>
+                      <select style={{ ...styles.select, marginBottom: 0 }} value={form.handover_mode} onChange={(e) => setForm({ ...form, handover_mode: e.target.value })}>
+                        <option value="inoffice">In-Office</option>
+                        <option value="delivery">Delivery</option>
+                        <option value="fixing">Fixing</option>
+                        <option value="offsite">Off-Site</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <label style={{ ...styles.checkboxLabel, color: "#dc2626", marginTop: "0" }}>
+                    <input type="checkbox" checked={form.is_urgent} onChange={(e) => setForm({ ...form, is_urgent: e.target.checked })} />
+                    🚨 Mark as Urgent Priority
+                  </label>
+
                 </div>
-
-
-                <label style={{ ...styles.checkboxLabel, color: "#dc2626" }}>
-                  <input type="checkbox" checked={form.is_urgent} onChange={(e) => setForm({ ...form, is_urgent: e.target.checked })} />
-                  🚨 Urgent Priority
-                </label>
               </div>
 
               <button onClick={createJob} disabled={loading} style={styles.btnPrimary}>
@@ -1371,7 +1601,7 @@ export default function Attendant() {
                     </div>
                     <span style={styles.badge}>#{job.job_card_no}</span>
                   </div>
-                  <div style={styles.cardMeta}>{job.size} • {job.material} • {job.phone} • Bal: ₹{(parseFloat(job.cost as any || 0) - parseFloat(job.advance as any || 0))}</div>
+                  <div style={styles.cardMeta}>{job.size} • {job.material} • {job.phone} • Bal: ₹{Number(job.cost || 0) - Number(job.advance || 0)}</div>
 
                   <button
                     onClick={() => completePickup(job)}
@@ -1755,4 +1985,3 @@ const getStatusColor = (status: string) => {
     default: return "#95a5a6";
   }
 };
-

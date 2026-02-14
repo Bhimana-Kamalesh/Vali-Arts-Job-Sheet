@@ -58,6 +58,17 @@ export default function Billing() {
   };
 
   const [available, setAvailable] = useState<Job[]>([]);
+
+  // Pricing Data
+  interface PricingConfig {
+    id: number;
+    category: string;
+    product_name: string;
+    price: number;
+    unit_type: 'sqft' | 'piece';
+    min_quantity: number;
+  }
+  const [pricingData, setPricingData] = useState<PricingConfig[]>([]);
   const [myJob, setMyJob] = useState<Job | null>(null);
 
   // 🔒 Universal single-job lock (Logic preserved)
@@ -91,8 +102,14 @@ export default function Billing() {
       .neq("status", "COMPLETED")
       .limit(1);
 
+    const { data: pricing } = await supabase
+      .from("pricing_config")
+      .select("*")
+      .order("category", { ascending: true });
+
     setAvailable(pool || []);
     setMyJob(mine?.[0] || null);
+    if (pricing) setPricingData(pricing);
   };
 
   useEffect(() => {
@@ -160,12 +177,36 @@ export default function Billing() {
     load();
   };
 
-  const generateBill = async (job: Job) => {
+  const urlToDataUrl = async (url: string): Promise<string | null> => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error("Error fetching image:", error);
+      return null;
+    }
+  };
+
+  const generateBill = async (job: Job, withGST: boolean = false) => {
     const doc = new jsPDF();
 
     const totalCost = Number(job.cost) || 0;
     const advancePaid = Number(job.advance) || 0;
-    const balanceDue = totalCost - advancePaid;
+    let finalTotal = totalCost;
+    let gstAmount = 0;
+
+    if (withGST) {
+      gstAmount = totalCost * 0.18;
+      finalTotal = totalCost + gstAmount;
+    }
+
+    let balanceDue = finalTotal - advancePaid;
 
     // ---------- HEADER ----------
     doc.setFont("helvetica", "bold");
@@ -183,7 +224,7 @@ export default function Billing() {
 
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text("INVOICE", 150, 20);
+    doc.text(withGST ? "TAX INVOICE" : "INVOICE", 150, 20);
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
@@ -217,18 +258,57 @@ export default function Billing() {
       .eq("job_id", job.job_id)
       .order("position", { ascending: true });
 
-    let tableBody = [];
+    // Helper to calculate cost if missing (legacy support)
+    const calculateFallbackCost = (item: any) => {
+      if (item.cost && item.cost > 0) return item.cost;
+
+      // Try to calculate based on pricingData
+      // Note: We assume 'ft' for sqft items as unit is not stored in job_items
+      const category = item.job_type === "Flex Banner" ? "Flex" : item.job_type;
+      const mat = item.material;
+      if (!mat) return 0;
+
+      const pricingEntry = pricingData.find(p => p.category === category && p.product_name === mat);
+
+      if (pricingEntry) {
+        let itemCost = 0;
+        const qty = parseFloat(item.quantity) || 0;
+
+        if (pricingEntry.unit_type === 'sqft') {
+          // Parse size string "10x10"
+          const parts = (item.size || "").toLowerCase().split('x');
+          if (parts.length === 2) {
+            const w = parseFloat(parts[0]) || 0;
+            const h = parseFloat(parts[1]) || 0;
+            const area = w * h;
+            itemCost = area * pricingEntry.price * qty;
+          }
+        } else if (pricingEntry.unit_type === 'piece') {
+          const applicableQty = Math.max(qty, pricingEntry.min_quantity);
+          itemCost = applicableQty * pricingEntry.price;
+        }
+        return Math.round(itemCost);
+      }
+      return 0;
+    };
+
+    let calculatedTotal = 0;
+    let tableBody: any[][] = [];
 
     if (jobItems && jobItems.length > 0) {
-      tableBody = jobItems.map((item) => [
-        item.description || item.job_type || "N/A",
-        item.material || "Standard",
-        item.size || "N/A",
-        item.quantity || "1",
-        `Rs. ${(item.cost || 0).toFixed(2)}`,
-      ]);
+      tableBody = jobItems.map((item) => {
+        const cost = calculateFallbackCost(item);
+        calculatedTotal += cost;
+        return [
+          item.description || item.job_type || "N/A",
+          item.material || "Standard",
+          item.size || "N/A",
+          item.quantity || "1",
+          `Rs. ${cost.toFixed(2)}`,
+        ];
+      });
     } else {
-      // Fallback for legacy jobs
+      // Fallback for VERY old jobs with no items table
       tableBody = [[
         job.description || job.job_type || "N/A",
         job.material || "Standard",
@@ -236,7 +316,20 @@ export default function Billing() {
         job.quantity || "1",
         `Rs. ${totalCost.toFixed(2)}`,
       ]];
+      calculatedTotal = totalCost; // Use job total
     }
+
+    // Recalculate totals based on items if we had to fallback
+    // If job.cost was 0, use calculatedTotal
+    const displayTotal = totalCost > 0 ? totalCost : calculatedTotal;
+
+    // Recalculate GST/Final based on potentially new total
+    finalTotal = displayTotal;
+    if (withGST) {
+      gstAmount = displayTotal * 0.18;
+      finalTotal = displayTotal + gstAmount;
+    }
+    balanceDue = finalTotal - advancePaid;
 
     // ---------- TABLE ----------
     autoTable(doc, {
@@ -250,56 +343,138 @@ export default function Billing() {
     doc.setFont("helvetica", "bold");
     doc.text("Subtotal:", 140, finalY);
     doc.setFont("helvetica", "normal");
-    doc.text(`Rs. ${totalCost.toFixed(2)}`, 175, finalY);
+    doc.text(`Rs. ${displayTotal.toFixed(2)}`, 175, finalY);
 
-    doc.setFont("helvetica", "bold");
-    doc.text("Advance:", 140, finalY + 7);
-    doc.setFont("helvetica", "normal");
-    doc.text(`- Rs. ${advancePaid.toFixed(2)}`, 175, finalY + 7);
+    if (withGST) {
+      doc.setFont("helvetica", "bold");
+      doc.text("GST (18%):", 140, finalY + 7);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Rs. ${gstAmount.toFixed(2)}`, 175, finalY + 7);
 
-    doc.line(140, finalY + 11, 195, finalY + 11);
+      // Total with GST
+      doc.setFont("helvetica", "bold");
+      doc.text("Total:", 140, finalY + 14);
+      doc.text(`Rs. ${finalTotal.toFixed(2)}`, 175, finalY + 14);
 
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("BALANCE DUE:", 120, finalY + 18);
-    doc.text(`Rs. ${balanceDue.toFixed(2)}`, 175, finalY + 18);
+      // Adjust Advance Y position
+      doc.text("Advance:", 140, finalY + 21);
+      doc.setFont("helvetica", "normal");
+      doc.text(`- Rs. ${advancePaid.toFixed(2)}`, 175, finalY + 21);
 
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "italic");
-    doc.text("Thank you for your business!", 14, finalY + 30);
+      doc.line(140, finalY + 25, 195, finalY + 25);
+
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("BALANCE DUE:", 120, finalY + 32);
+      doc.text(`Rs. ${balanceDue.toFixed(2)}`, 175, finalY + 32);
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "italic");
+      doc.text("Thank you for your business!", 14, finalY + 44);
+    } else {
+      doc.setFont("helvetica", "bold");
+      doc.text("Advance:", 140, finalY + 7);
+      doc.setFont("helvetica", "normal");
+      doc.text(`- Rs. ${advancePaid.toFixed(2)}`, 175, finalY + 7);
+
+      doc.line(140, finalY + 11, 195, finalY + 11);
+
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("BALANCE DUE:", 120, finalY + 18);
+      doc.text(`Rs. ${balanceDue.toFixed(2)}`, 175, finalY + 18);
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "italic");
+      doc.text("Thank you for your business!", 14, finalY + 30);
+    }
+
+    // ---------- DESIGN IMAGES ----------
+    if (job.design_url) {
+      const urls = job.design_url.split(",").map(u => u.trim()).filter(u => u);
+      // jsPDF default unit is mm.
+
+      let imgX = 14;
+      let imgY = (withGST ? finalY + 50 : finalY + 36);
+
+      // Check if we need a new page
+      if (imgY + 30 > 280) {
+        doc.addPage();
+        imgY = 20;
+      }
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("Design Reference:", 14, imgY - 5);
+
+      for (const url of urls) {
+        // Skip non-image files roughly - allow typical image extensions
+        if (url.match(/\.(jpeg|jpg|png|webp)$/i) || url.includes("supabase")) {
+          const base64 = await urlToDataUrl(url);
+          if (base64) {
+            try {
+              let format = "JPEG";
+              if (base64.startsWith("data:image/png")) format = "PNG";
+              else if (base64.startsWith("data:image/webp")) format = "WEBP";
+
+              doc.addImage(base64, format, imgX, imgY, 50, 50);
+              imgX += 60; // spacing
+              // Wrap to next line if needed
+              if (imgX > 170) {
+                imgX = 14;
+                imgY += 60;
+                if (imgY > 270) {
+                  doc.addPage();
+                  imgY = 20;
+                }
+              }
+            } catch (e) {
+              console.error("Failed to add image to PDF", e);
+            }
+          }
+        }
+      }
+    }
 
     // ---------- DOWNLOAD PDF ----------
     // Trigger download to user's computer
-    doc.save(`Invoice_${job.bill_no || job.job_id}_${job.customer_name}.pdf`);
+    const type = withGST ? "GST_Invoice" : "Invoice";
+    doc.save(`${type}_${job.bill_no || job.job_id}_${job.customer_name}.pdf`);
 
-    // ---------- UPLOAD TO STORAGE ----------
-    const pdfBlob = doc.output("blob");
-    const fileName = `invoice-${job.job_id}-${Date.now()}.pdf`;
+    // Only upload the standard invoice to storage for record keeping (or both if needed, but usually one record is enough)
+    // For now, only upload if it's the standard key, or we can skip upload for GST view only.
+    // Let's upload standard only to keep logic simple, or upload with distinct name.
 
-    const { error: uploadError } = await supabase.storage
-      .from("invoices")
-      .upload(fileName, pdfBlob, {
-        contentType: "application/pdf",
-        upsert: true,
-      });
+    if (!withGST) {
+      // ---------- UPLOAD TO STORAGE ----------
+      const pdfBlob = doc.output("blob");
+      const fileName = `invoice-${job.job_id}-${Date.now()}.pdf`;
 
-    if (uploadError) {
-      alert("Failed to upload invoice PDF to storage");
-      return;
+      const { error: uploadError } = await supabase.storage
+        .from("invoices")
+        .upload(fileName, pdfBlob, {
+          contentType: "application/pdf",
+          upsert: true,
+        });
+
+      if (uploadError) {
+        alert("Failed to upload invoice PDF to storage");
+        return;
+      }
+
+      const { data } = supabase.storage
+        .from("invoices")
+        .getPublicUrl(fileName);
+
+      const invoiceUrl = data.publicUrl;
+
+      await supabase
+        .from("jobs")
+        .update({ invoice_pdf: invoiceUrl })
+        .eq("job_id", job.job_id);
+
+      alert("✅ Invoice downloaded and saved successfully");
     }
-
-    const { data } = supabase.storage
-      .from("invoices")
-      .getPublicUrl(fileName);
-
-    const invoiceUrl = data.publicUrl;
-
-    await supabase
-      .from("jobs")
-      .update({ invoice_pdf: invoiceUrl })
-      .eq("job_id", job.job_id);
-
-    alert("✅ Invoice downloaded and saved successfully");
   };
 
 
@@ -431,9 +606,14 @@ export default function Billing() {
               <div style={styles.actionSection}>
                 <label style={styles.label}>Post-Billing Actions</label>
                 <div style={styles.btnGrid}>
-                  <button onClick={() => generateBill(myJob)} style={styles.btnPdf}>
-                    📄 Generate Invoice PDF
-                  </button>
+                  <div style={{ display: "flex", gap: "10px", flexDirection: "column" }}>
+                    <button onClick={() => generateBill(myJob, false)} style={styles.btnPdf}>
+                      📄 Download Invoice
+                    </button>
+                    <button onClick={() => generateBill(myJob, true)} style={{ ...styles.btnPdf, backgroundColor: "#7c3aed" }}>
+                      📊 Download GST Invoice (+18%)
+                    </button>
+                  </div>
                   <button onClick={() => done(myJob)} style={styles.btnComplete}>
                     ✅ Confirm Payment & Send to Print
                   </button>
